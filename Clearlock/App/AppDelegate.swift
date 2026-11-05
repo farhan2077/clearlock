@@ -24,6 +24,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #endif
     }
 
+    /// The same About window as the menu bar's About item, with the credits and links.
+    @objc func showAbout(_ sender: Any?) {
+        WindowCoordinator.shared.showAbout()
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         // Nobody, including a script or agent, can quit Clearlock to get past the lock.
         Self.terminateReply(isLocked: LockController.shared.isLocked)
@@ -64,7 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let main = NSMenu()
 
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "About Clearlock", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        appMenu.addItem(withTitle: "About Clearlock", action: #selector(AppDelegate.showAbout(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quit Clearlock", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         main.addItem(withTitle: "Clearlock", action: nil, keyEquivalent: "").submenu = appMenu
@@ -143,6 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case let name? where name.hasPrefix("settings-"):
                     WindowCoordinator.shared.showSettings(SettingsPane.allCases.first { "settings-\($0.title.lowercased())" == name })
                 case "diagnostics": WindowCoordinator.shared.showDiagnostics()
+                case "about": WindowCoordinator.shared.showAbout()
                 case "password": LockController.shared.debugShowPassword()
                 case "close": NSApp.windows.filter { $0.isVisible && $0.styleMask.contains(.titled) }.forEach { $0.performClose(nil) }
                 default: WindowCoordinator.shared.showOnboarding()

@@ -104,11 +104,31 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
 
     func showAbout() {
         requestActivation()
-        let credits = NSAttributedString(
-            string: "Keeps your Mac awake and locks out everyone but you while your work keeps running.",
-            attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
-                         .foregroundColor: NSColor.secondaryLabelColor])
-        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.aboutCredits])
+    }
+
+    static let authorURL = URL(string: "https://farhanbinamin.com")!
+    static let projectURL = URL(string: "https://github.com/farhan2077/clearlock")!
+
+    /// The About window's text: the tagline, then "Built by Farhan Bin Amin · GitHub", with
+    /// the name linking to the author's site and GitHub to the project.
+    static var aboutCredits: NSAttributedString {
+        let centered = NSMutableParagraphStyle()
+        centered.alignment = .center
+        let plain: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+            .foregroundColor: NSColor.secondaryLabelColor,
+            .paragraphStyle: centered,
+        ]
+        func link(_ text: String, _ url: URL) -> NSAttributedString {
+            NSAttributedString(string: text, attributes: plain.merging([.link: url]) { $1 })
+        }
+        let credits = NSMutableAttributedString(string: "Lock your Mac without stopping your work.\n\nBuilt by ",
+                                                attributes: plain)
+        credits.append(link("Farhan Bin Amin", authorURL))
+        credits.append(NSAttributedString(string: " · ", attributes: plain))
+        credits.append(link("GitHub", projectURL))
+        return credits
     }
 
     /// SwiftUI sizes the window after it's created, growing it from its bottom-left corner,

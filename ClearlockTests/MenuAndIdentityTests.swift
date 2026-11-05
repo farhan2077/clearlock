@@ -70,4 +70,16 @@ struct MenuAndIdentityTests {
         defer { controller.removeFromMenuBar() }
         #expect(controller.opensMenuOnClick)
     }
+
+    @Test("About links the author's name to farhanbinamin.com and GitHub to the project")
+    func aboutLinks() {
+        let credits = WindowCoordinator.aboutCredits
+        var links: [URL] = []
+        credits.enumerateAttribute(.link, in: NSRange(location: 0, length: credits.length)) { value, _, _ in
+            if let url = value as? URL { links.append(url) }
+        }
+        #expect(links == [URL(string: "https://farhanbinamin.com")!, URL(string: "https://github.com/farhan2077/clearlock")!])
+        #expect(WindowCoordinator.projectURL.absoluteString.hasSuffix(Updater.repository(from: Bundle.main.object(forInfoDictionaryKey: "AWLUpdateRepository")) ?? "-"))
+    }
+
 }

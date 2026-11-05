@@ -19,7 +19,7 @@ scripts/release.sh 1.1.0 --publish   # Only with the owner's go-ahead for that v
 - **Debug hooks** (Debug builds only; they also let you release a lock from Terminal or over SSH):
 
 ```bash
-scripts/debug-lock.sh lock                    # or: unlock, settings, settings-general, settings-advanced, diagnostics, onboarding
+scripts/debug-lock.sh lock                    # or: unlock, settings, settings-general, settings-advanced, diagnostics, about, onboarding
 scripts/debug-lock.sh snapshot <folder>       # PNGs of all visible windows
 scripts/debug-lock.sh status <file>           # lock and focus state
 scripts/debug-lock.sh cardtest <file>         # checks the pill never moves, without locking
@@ -27,7 +27,7 @@ scripts/debug-lock.sh cardtest <file>         # checks the pill never moves, wit
 
 ## Keeping the docs in sync
 
-- **`README.md` is for users and stays short:** the icon, badges, a one-line pitch, a feature list in plain language, Install, Uninstall, and two build commands that point here. No implementation details, settings tables, test counts, debug hooks or release steps; those live in this file. **Whenever a change touches anything it mentions, update the README in the same change.** A change isn't done while the README says something the app no longer does.
+- **`README.md` is for users and stays short:** the icon, badges, a one-line pitch, a feature list in plain language, Install, Uninstall, two build commands that point here, and a centered "Built by Farhan Bin Amin" credit line at the end. No implementation details, settings tables, test counts, debug hooks or release steps; those live in this file. **Whenever a change touches anything it mentions, update the README in the same change.** A change isn't done while the README says something the app no longer does.
   - It covers the features, the shortcut, requirements, the install steps (including "Open Anyway" and Accessibility), uninstalling (including the lid helper), and the idle memory figure.
   - When resource use changes, measure the Release build again (`footprint`, `top`) instead of guessing, and update both files. Say so when a number couldn't be re-measured, for example anything that needs locking the owner's screen.
 - **This file is updated the same way** whenever a decision, default or rule changes.
@@ -115,6 +115,7 @@ scripts/debug-lock.sh cardtest <file>         # checks the pill never moves, wit
 - **Icon:** always a lock. Open lock (`lock.open`) while unlocked (no cup, no dimming). White lock on a pill in the chosen tint while locked. Keep Awake shows only in the tooltip and VoiceOver label.
 - **Clicking the icon always opens the menu.** There's no "click to lock" option.
 - **Menu items, only:** Lock Now (Unlock… while locked, Finish Setup to Lock… while the welcome guide is open), Settings…, Check for Updates… (Restart to Update once an update is downloaded), About, Quit (disabled while locked). `StatusItemController.menuEntries` decides this.
+- **About:** the standard About window with the tagline "Lock your Mac without stopping your work." and "Built by Farhan Bin Amin · GitHub", the name linking to https://farhanbinamin.com and GitHub to https://github.com/farhan2077/clearlock (`WindowCoordinator.aboutCredits`). The hidden main menu's About item opens the same window.
   - No status header, no Keep Awake, no Diagnostics in the menu. Diagnostics lives in Settings › Advanced; Keep Awake is always on.
 
 ## Settings

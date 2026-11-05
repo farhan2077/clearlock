@@ -57,3 +57,9 @@ scripts/test.sh           # run the tests
 ```
 
 Project rules and technical details are in [CLAUDE.md](CLAUDE.md).
+
+---
+
+<p align="center">
+  Built by <a href="https://farhanbinamin.com">Farhan Bin Amin</a> · <a href="https://github.com/farhan2077/clearlock">github.com/farhan2077/clearlock</a>
+</p>

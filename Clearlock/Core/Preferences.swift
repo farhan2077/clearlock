@@ -41,6 +41,12 @@ enum CardPosition: String, CaseIterable, Identifiable {
     /// -1 (left/bottom), 0 (middle) or 1 (right/top) on each axis.
     var column: Int { [.topLeft, .left, .bottomLeft].contains(self) ? -1 : [.topRight, .right, .bottomRight].contains(self) ? 1 : 0 }
     var row: Int { [.topLeft, .top, .topRight].contains(self) ? 1 : [.bottomLeft, .bottom, .bottomRight].contains(self) ? -1 : 0 }
+
+    /// The position for a cell of the 3 × 3 grid in Settings, counting rows from the top and
+    /// columns from the left (0, 1, 2), so the grid matches where the pill lands on screen.
+    static func at(gridRow: Int, gridColumn: Int) -> CardPosition? {
+        allCases.first { 1 - $0.row == gridRow && $0.column + 1 == gridColumn }
+    }
 }
 
 /// All user-configurable settings, persisted in UserDefaults. Observable so both

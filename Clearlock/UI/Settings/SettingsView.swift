@@ -82,11 +82,11 @@ struct SettingsView: View {
 
         case .lockScreen:
             Section("Lock Screen") {
-                Picker("Position", selection: $prefs.cardPosition) {
-                    ForEach(CardPosition.allCases) { position in
-                        Text(position.title).tag(position)
-                        if position == .topRight || position == .right { Divider() }
-                    }
+                LabeledContent {
+                    PositionGrid(selection: $prefs.cardPosition, tint: Color(nsColor: prefs.tint.color))
+                } label: {
+                    Text("Position")
+                    Text(prefs.cardPosition.title)
                 }
                 LabeledContent {
                     HStack {

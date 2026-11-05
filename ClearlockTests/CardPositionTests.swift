@@ -51,4 +51,29 @@ struct CardPositionTests {
         #expect(abs(pill.midX - area.midX) <= 1)
         #expect(abs(pill.midY - (area.midY + area.height * 0.04)) <= 1)
     }
+
+    @Test("The Settings grid matches the screen: top-left cell is Top Left, bottom-right is Bottom Right")
+    func gridCorners() {
+        #expect(CardPosition.at(gridRow: 0, gridColumn: 0) == .topLeft)
+        #expect(CardPosition.at(gridRow: 0, gridColumn: 2) == .topRight)
+        #expect(CardPosition.at(gridRow: 1, gridColumn: 1) == .center)
+        #expect(CardPosition.at(gridRow: 2, gridColumn: 0) == .bottomLeft)
+        #expect(CardPosition.at(gridRow: 2, gridColumn: 2) == .bottomRight)
+    }
+
+    @Test("Every grid cell picks a different position, all nine are reachable, and cells match where the pill lands",
+          arguments: CardPosition.allCases)
+    func gridCellPerPosition(position: CardPosition) {
+        let row = 1 - position.row, column = position.column + 1
+        #expect(CardPosition.at(gridRow: row, gridColumn: column) == position)
+        let cells = (0..<3).flatMap { r in (0..<3).compactMap { c in CardPosition.at(gridRow: r, gridColumn: c) } }
+        #expect(Set(cells).count == 9)
+    }
+
+    @Test("Cells outside the 3 × 3 grid pick nothing")
+    func gridOutOfRange() {
+        #expect(CardPosition.at(gridRow: 3, gridColumn: 0) == nil)
+        #expect(CardPosition.at(gridRow: 0, gridColumn: -1) == nil)
+    }
+
 }

@@ -9,6 +9,11 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
     enum Kind { case settings, onboarding, diagnostics }
 
     private var settingsWindow: NSWindow?
+
+    #if DEBUG
+    var debugSettingsWindow: NSWindow? { settingsWindow }
+    private(set) var debugShowSettingsCalls = 0
+    #endif
     private var onboardingWindow: NSWindow?
     private var diagnosticsWindow: NSWindow?
 
@@ -42,7 +47,14 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
     }
 
     func showSettings(_ pane: SettingsPane? = nil) {
+        #if DEBUG
+        debugShowSettingsCalls += 1
+        DebugTrace.note("showSettings called, window \(settingsWindow == nil ? "will be built" : "exists")")
+        #endif
         requestActivation()
+        #if DEBUG
+        DebugTrace.note("after first activation request")
+        #endif
         if settingsWindow == nil {
             let tabs = NSTabViewController()
             tabs.tabStyle = .toolbar
@@ -172,7 +184,13 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
         if !isAppActive() { activateApp() }
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
+        #if DEBUG
+        DebugTrace.note("presented '\(window.title)' visible=\(window.isVisible) key=\(window.isKeyWindow)")
+        #endif
         DispatchQueue.main.async { [weak self, weak window] in
+            #if DEBUG
+            DebugTrace.note("retry check: visible=\(window?.isVisible ?? false)")
+            #endif
             guard let self, let window, window.isVisible, !self.isAppActive() else { return }
             self.activateApp()
             window.makeKeyAndOrderFront(nil)

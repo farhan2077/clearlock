@@ -16,6 +16,7 @@ scripts/release.sh 1.1.0 --publish   # Only with the owner's go-ahead for that v
 
 - **First build:** `scripts/build.sh` runs `scripts/setup-signing.sh`, which creates the self-signed certificate in `.signing/` if it's missing.
 - **Xcode:** `Clearlock.xcodeproj` opens fine, but Cmd-R signs ad hoc, so Accessibility permission resets with each Xcode build. Use the scripts when testing the Shield.
+- **Window focus trace** (Debug builds only, `DebugTrace`): menu open and close, Settings… firing, activation and every titled window's key and visibility changes go to the system log. Read them with `log show --last 10m --predicate 'subsystem == "com.farhan2077.clearlock" AND category == "trace"' --style compact`. `menutest` clicks the menu bar icon for real when the build may post events, otherwise it drives the same menu from inside the app.
 - **Debug hooks** (Debug builds only; they also let you release a lock from Terminal or over SSH):
 
 ```bash
@@ -23,6 +24,7 @@ scripts/debug-lock.sh lock                    # or: unlock, settings, settings-g
 scripts/debug-lock.sh snapshot <folder>       # PNGs of all visible windows
 scripts/debug-lock.sh status <file>           # lock and focus state
 scripts/debug-lock.sh cardtest <file>         # checks the pill never moves, without locking
+scripts/debug-lock.sh menutest <file>         # chooses Settings… from the real menu and records the window state
 ```
 
 ## Keeping the docs in sync

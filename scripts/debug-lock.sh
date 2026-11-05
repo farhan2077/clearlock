@@ -13,6 +13,7 @@ case $ACTION in
   snapshot) NAME="com.farhan2077.clearlock.debug.snapshot"; OBJECT=${2:?folder required} ;;
   status) NAME="com.farhan2077.clearlock.debug.status"; OBJECT=${2:?file required} ;;
   cardtest) NAME="com.farhan2077.clearlock.debug.cardtest"; OBJECT=${2:?file required} ;;
+  menutest) NAME="com.farhan2077.clearlock.debug.menutest"; OBJECT=${2:?file required} ;;
   *) NAME="com.farhan2077.clearlock.debug.window"; OBJECT=$ACTION ;;
 esac
 swift -e "import Foundation

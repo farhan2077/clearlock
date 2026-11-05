@@ -30,6 +30,31 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     func removeFromMenuBar() { item.statusBar?.removeStatusItem(item) }
 
+    #if DEBUG
+    /// Where the menu bar icon is on screen, so a debug hook can click it like a person.
+    var debugButtonScreenFrame: NSRect? { item.button?.window?.frame }
+    private(set) var debugMenuOpens = 0
+    private(set) var debugMenuCloses = 0
+    func menuWillOpen(_ menu: NSMenu) { debugMenuOpens += 1; DebugTrace.note("menu will open") }
+
+    /// Opens the real menu the way a click does, then, while it's open, closes it and
+    /// chooses the item with this title, the order AppKit uses for a real selection.
+    func debugChooseFromMenu(_ title: String) {
+        let timer = Timer(timeInterval: 0.6, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, let menu = Optional(self.menu), let index = menu.items.firstIndex(where: { $0.title == title }) else { return }
+                menu.cancelTracking()
+                DispatchQueue.main.async { [weak self] in
+                    MainActor.assumeIsolated { self?.menu.performActionForItem(at: index) }
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        item.button?.performClick(nil)
+    }
+    func menuDidClose(_ menu: NSMenu) { debugMenuCloses += 1; DebugTrace.note("menu did close") }
+    #endif
+
     // MARK: Icon
 
     private func refreshButton() {

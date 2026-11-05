@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #if DEBUG
         installDebugHooks()
+        DebugTrace.start()
         #endif
     }
 
@@ -97,6 +98,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Terminal or over SSH: see scripts/debug-lock.sh.
     private func installDebugHooks() {
         let center = DistributedNotificationCenter.default()
+        // Clicks the real menu bar icon and chooses Settings… with the keyboard, like a person,
+        // then writes what happened to the Settings window. Needs Accessibility to post events.
+        center.addObserver(forName: Notification.Name("com.farhan2077.clearlock.debug.menutest"), object: nil, queue: .main) { [weak self] note in
+            let path = note.object as? String ?? NSTemporaryDirectory() + "clearlock-menutest.txt"
+            let forceInApp = note.userInfo?["inApp"] != nil
+            MainActor.assumeIsolated {
+                guard let frame = self?.statusItem?.debugButtonScreenFrame, let primary = NSScreen.screens.first else { return }
+                let point = CGPoint(x: frame.midX, y: primary.frame.maxY - frame.midY)
+                let callsBefore = WindowCoordinator.shared.debugShowSettingsCalls
+                let item = self?.statusItem
+                let opensBefore = item?.debugMenuOpens ?? 0, closesBefore = item?.debugMenuCloses ?? 0
+                var log = ["can post events: \(AXIsProcessTrusted())",
+                           "front before: \(NSWorkspace.shared.frontmostApplication?.localizedName ?? "-")",
+                           "settings window before: \(WindowCoordinator.shared.debugSettingsWindow == nil ? "none" : "exists")"]
+                func mouse(_ type: CGEventType) {
+                    CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)?.post(tap: .cghidEventTap)
+                }
+                func key(_ code: CGKeyCode) {
+                    CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true)?.post(tap: .cghidEventTap)
+                    CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: false)?.post(tap: .cghidEventTap)
+                }
+                if forceInApp || !AXIsProcessTrusted() {
+                    // Without permission to post events, drive the same menu from inside.
+                    log.append("mode: in-app menu")
+                    DispatchQueue.main.async { item?.debugChooseFromMenu("Settings…") }
+                } else {
+                    log.append("mode: real clicks")
+                    mouse(.leftMouseDown)
+                    mouse(.leftMouseUp)
+                    // Down, Down highlights Settings… (Lock Now, then Settings; separators are skipped).
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { key(125) }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { key(125) }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { key(36) }
+                }
+                for delay in [0.1, 0.3, 0.6, 1.0, 2.0] {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2 + delay) {
+                        MainActor.assumeIsolated {
+                            let window = WindowCoordinator.shared.debugSettingsWindow
+                            let visibleOnScreen = window.map { $0.occlusionState.contains(.visible) } ?? false
+                            log.append("+\(delay)s menu opens=\((item?.debugMenuOpens ?? 0) - opensBefore) closes=\((item?.debugMenuCloses ?? 0) - closesBefore)")
+                            log.append(String(format: "+%.1fs: showSettings calls=%d window=%@ isVisible=%@ onScreenVisible=%@ isKey=%@ appActive=%@ front=%@ frame=%@ alpha=%.2f",
+                                              delay, WindowCoordinator.shared.debugShowSettingsCalls - callsBefore,
+                                              window == nil ? "none" : "exists", "\(window?.isVisible ?? false)", "\(visibleOnScreen)",
+                                              "\(window?.isKeyWindow ?? false)", "\(NSApp.isActive)",
+                                              NSWorkspace.shared.frontmostApplication?.localizedName ?? "-",
+                                              window.map { NSStringFromRect($0.frame) } ?? "-", window?.alphaValue ?? 0))
+                            if delay == 2.0 { try? log.joined(separator: "\n").write(toFile: path, atomically: true, encoding: .utf8) }
+                        }
+                    }
+                }
+            }
+        }
         center.addObserver(forName: Notification.Name("com.farhan2077.clearlock.debug.lock"), object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { LockController.shared.lock(source: "debug") }
         }

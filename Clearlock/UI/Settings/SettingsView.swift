@@ -175,7 +175,7 @@ struct SettingsView: View {
     @ViewBuilder private var statusView: some View {
         switch updater.state {
         case .idle:
-            Label("Not checked yet", systemImage: "questionmark.circle").foregroundStyle(.secondary)
+            Text("Not checked yet").foregroundStyle(.secondary)
         case .checking:
             HStack(spacing: 6) { ProgressView().controlSize(.small); Text("Checking…") }
         case .upToDate:

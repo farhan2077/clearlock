@@ -42,6 +42,7 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
     }
 
     func showSettings(_ pane: SettingsPane? = nil) {
+        requestActivation()
         if settingsWindow == nil {
             let tabs = NSTabViewController()
             tabs.tabStyle = .toolbar
@@ -69,6 +70,7 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
     }
 
     func showOnboarding() {
+        requestActivation()
         if onboardingWindow == nil {
             let host = NSHostingController(rootView: OnboardingView { [weak self] in
                 Preferences.shared.hasCompletedOnboarding = true
@@ -86,6 +88,7 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
     }
 
     func showDiagnostics() {
+        requestActivation()
         if diagnosticsWindow == nil {
             let host = NSHostingController(rootView: DiagnosticsView())
             let window = NSWindow(contentViewController: host)
@@ -100,7 +103,7 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
     }
 
     func showAbout() {
-        NSApp.activate()
+        requestActivation()
         let credits = NSAttributedString(
             string: "Keeps your Mac awake and locks out everyone but you while your work keeps running.",
             attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
@@ -129,10 +132,31 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
         NSPoint(x: (area.midX - size.width / 2).rounded(), y: (area.midY - size.height / 2).rounded())
     }
 
-    private func present(_ window: NSWindow?) {
+    /// Asks macOS to bring Clearlock forward. Replaceable in tests, which must never take
+    /// focus from the person running them.
+    var activateApp: () -> Void = { NSApp.activate() }
+    var isAppActive: () -> Bool = { NSApp.isActive }
+
+    /// Asks to come forward right away, before a window is built: the first build of a
+    /// SwiftUI window is slow, and macOS can turn down a request that comes late after the
+    /// click. Turned down, the window used to open behind the frontmost app or unfocused,
+    /// so Settings needed a second click the first time.
+    func requestActivation() {
+        if !isAppActive() { activateApp() }
+    }
+
+    /// Shows the window on top whether or not macOS let Clearlock come forward, and asks
+    /// once more after it's on screen if it still isn't active.
+    func present(_ window: NSWindow?) {
         guard let window else { return }
-        NSApp.activate()
+        if !isAppActive() { activateApp() }
         window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let self, let window, window.isVisible, !self.isAppActive() else { return }
+            self.activateApp()
+            window.makeKeyAndOrderFront(nil)
+        }
     }
 
     func windowWillClose(_ notification: Notification) {

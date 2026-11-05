@@ -175,21 +175,26 @@ struct SettingsView: View {
     @ViewBuilder private var statusView: some View {
         switch updater.state {
         case .idle:
-            Text("Not checked yet").foregroundStyle(.secondary)
+            Label("Not checked yet", systemImage: "questionmark.circle")
+                .labelStyle(StatusLabelStyle()).foregroundStyle(.secondary)
         case .checking:
-            HStack(spacing: 6) { ProgressView().controlSize(.small); Text("Checking…") }
+            HStack(spacing: StatusLabelStyle.spacing) { ProgressView().controlSize(.mini); Text("Checking…") }
         case .upToDate:
-            Label("Clearlock is up to date", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            Label("Clearlock is up to date", systemImage: "checkmark.circle.fill")
+                .labelStyle(StatusLabelStyle()).foregroundStyle(.green)
         case .available(let release):
-            Label("Version \(release.version) is available", systemImage: "arrow.down.circle.fill").foregroundStyle(.blue)
+            Label("Version \(release.version) is available", systemImage: "arrow.down.circle.fill")
+                .labelStyle(StatusLabelStyle()).foregroundStyle(.blue)
         case .downloading(let release):
-            HStack(spacing: 6) { ProgressView().controlSize(.small); Text("Downloading \(release.version)…") }
+            HStack(spacing: StatusLabelStyle.spacing) { ProgressView().controlSize(.mini); Text("Downloading \(release.version)…") }
         case .ready(let release, _):
-            Label("Version \(release.version) is ready to install", systemImage: "checkmark.seal.fill").foregroundStyle(.green)
+            Label("Version \(release.version) is ready to install", systemImage: "checkmark.seal.fill")
+                .labelStyle(StatusLabelStyle()).foregroundStyle(.green)
         case .installing:
-            HStack(spacing: 6) { ProgressView().controlSize(.small); Text("Installing…") }
+            HStack(spacing: StatusLabelStyle.spacing) { ProgressView().controlSize(.mini); Text("Installing…") }
         case .failed(let message):
-            Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .labelStyle(StatusLabelStyle()).foregroundStyle(.orange)
         }
     }
 
@@ -272,5 +277,17 @@ struct AccessibilityPermissionRow: View {
             }
         }
         .animation(.snappy, value: trusted)
+    }
+}
+
+/// An update status: its icon sits close to the text, closer than a plain Label puts it.
+struct StatusLabelStyle: LabelStyle {
+    static let spacing: CGFloat = 4
+
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: Self.spacing) {
+            configuration.icon
+            configuration.title
+        }
     }
 }

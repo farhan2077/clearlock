@@ -28,7 +28,6 @@ Like a glass case: everything stays visible, but nothing can be touched.
 - **Keeps running with the lid closed** (optional), only when plugged in if you like.
 - **Light on your Mac.** About 15 MB of memory and no CPU use while idle. A built-in Diagnostics window shows exactly what it costs.
 - **Updates itself** from GitHub Releases.
-- **Remembers your settings,** even if you uninstall and reinstall.
 
 ## Install
 

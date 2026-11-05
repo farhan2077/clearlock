@@ -96,8 +96,14 @@ security unlock-keychain -p clearlock "$KEYCHAIN"
 codesign --force --timestamp=none --keychain "$KEYCHAIN" -s "$IDENTITY" --identifier com.farhan2077.clearlock.dmg "$DMG"
 hdiutil verify -quiet "$DMG"
 
+# The installed app's size, in decimal megabytes like Finder shows, for the README badge.
+APP_BYTES=$(unzip -l "$ZIP" | tail -1 | awk '{print $1}')
+APP_SIZE=$(awk -v b="$APP_BYTES" 'BEGIN { printf "%.1f", b / 1000000 }')
+
 print "Packaged:"
 for f in "$DMG" "$ZIP"; do print "  ${f#$ROOT/}  $(du -h "$f" | cut -f1)  sha256 $(shasum -a 256 "$f" | cut -c1-16)…"; done
+
+print "  app size $APP_SIZE MB (README badge)"
 
 if (( ! PUBLISH )); then
   print "Dry run: nothing was committed, tagged or published."
@@ -105,7 +111,9 @@ if (( ! PUBLISH )); then
   exit 0
 fi
 
-git add "$PBX"
+README="$ROOT/README.md"
+sed -i '' -E "s|badge/app%20size-[0-9.]+%20MB-blue\" alt=\"App size [0-9.]+ MB|badge/app%20size-$APP_SIZE%20MB-blue\" alt=\"App size $APP_SIZE MB|" "$README"
+git add "$PBX" "$README"
 git commit --quiet -m "Release $VERSION"
 trap - EXIT
 git tag -a "v$VERSION" -m "Clearlock $VERSION"

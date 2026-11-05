@@ -12,8 +12,7 @@
 <p align="center">
   <a href="https://github.com/farhan2077/clearlock/releases/latest"><img src="https://img.shields.io/github/v/release/farhan2077/clearlock?label=release" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/macOS-26%2B-000000?logo=apple&logoColor=white" alt="macOS 26 or later">
-  <img src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white" alt="Swift 6">
-  <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="No dependencies">
+  <img src="https://img.shields.io/badge/app%20size-4.1%20MB-blue" alt="App size 4.1 MB">
 </p>
 
 Like a glass case: everything stays visible, but nothing can be touched.

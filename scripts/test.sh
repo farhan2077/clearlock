@@ -9,7 +9,10 @@
 # after 5 minutes with the still-running tests named.
 set -uo pipefail
 ROOT=${0:A:h:h}
-LOG=$(mktemp -t clearlock-tests)
+# CI passes CLEARLOCK_TEST_LOG so it can keep the log of a failed run; macOS's mktemp
+# ignores TMPDIR, so the default location can't be steered from outside.
+LOG=${CLEARLOCK_TEST_LOG:-$(mktemp -t clearlock-tests)}
+: > "$LOG"
 LIMIT=300
 GRACE=20
 
@@ -74,4 +77,11 @@ wait $PID
 STATUS=$?
 (( STATUS == 0 )) && ! passed_cleanly "$LOG" && STATUS=1
 grep -E "✔|✘|Test run|passed|failed|error:|\*\* TEST" "$LOG" | grep -v "linkd" || true
+if (( STATUS != 0 )) && ! grep -qE 'Test run with' "$LOG"; then
+  # The build failed before any test ran: show the compiler's own messages.
+  echo "--- Build output around errors ---"
+  grep -nE -B3 -A8 'error:|Stack dump|fatal error|Assertion failed|Segmentation fault' "$LOG" | cut -c1-400 | head -200 || true
+  echo "--- Last 40 lines ---"
+  tail -40 "$LOG" | cut -c1-400
+fi
 exit $STATUS

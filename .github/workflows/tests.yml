@@ -40,12 +40,12 @@ jobs:
         run: scripts/test.sh
         env:
           # test.sh writes its log here and keeps it only when the run fails.
-          TMPDIR: ${{ runner.temp }}
+          CLEARLOCK_TEST_LOG: ${{ runner.temp }}/clearlock-tests.log
 
       - name: Keep the log of a failed run
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: test-log
-          path: ${{ runner.temp }}/clearlock-tests.*
+          path: ${{ runner.temp }}/clearlock-tests.log
           if-no-files-found: ignore

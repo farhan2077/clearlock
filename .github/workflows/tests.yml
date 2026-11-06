@@ -1,0 +1,51 @@
+# Runs the unit tests on every push that changes the app, its tests or how they're built.
+# Pushes that only touch docs or repo housekeeping (README.md, CLAUDE.md, .gitignore, the
+# release and signing scripts, …) don't affect the app, so they don't run anything.
+name: Tests
+
+on:
+  push:
+    paths:
+      - "Clearlock/**"
+      - "ClearlockTests/**"
+      - "Clearlock.xcodeproj/**"
+      - "Config/**"
+      - "scripts/test.sh"
+      - ".github/workflows/tests.yml"
+  workflow_dispatch:
+
+# A newer push to the same branch replaces a run that's still going.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Unit tests
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # Clearlock needs the macOS 26 SDK or later, which the runner's default Xcode has.
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      # Tests build with the project's ad-hoc signing; the self-signed release certificate
+      # is never needed (or present) here.
+      - name: Run tests
+        run: scripts/test.sh
+        env:
+          # test.sh writes its log here and keeps it only when the run fails.
+          TMPDIR: ${{ runner.temp }}
+
+      - name: Keep the log of a failed run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-log
+          path: ${{ runner.temp }}/clearlock-tests.*
+          if-no-files-found: ignore

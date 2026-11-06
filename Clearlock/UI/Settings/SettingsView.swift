@@ -211,7 +211,7 @@ struct SettingsView: View {
         case .ready:
             Button("Restart to Update") { updater.installAndRelaunch() }
                 .buttonStyle(.borderedProminent)
-                .disabled(LockController.shared.isLocked)
+                .disabled(!Updater.canInstall(isLocked: LockController.shared.isLocked))
         case .checking, .downloading, .installing:
             EmptyView()
         default:

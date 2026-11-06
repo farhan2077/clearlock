@@ -66,7 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Accessory apps have no visible menu bar, but the key equivalents still matter:
     /// without an Edit menu, ⌘V and friends don't work in text fields.
-    private static func makeMainMenu() -> NSMenu {
+    static func makeMainMenu() -> NSMenu {
         let main = NSMenu()
 
         let appMenu = NSMenu()

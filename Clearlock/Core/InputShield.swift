@@ -196,7 +196,8 @@ final class InputShield {
 
     // MARK: Helpers
 
-    private static let blockedTypes: [UInt32] = [
+    /// Every kind of input the tap sees. Anything left out would reach the Mac untouched.
+    static let blockedTypes: [UInt32] = [
         CGEventType.keyDown.rawValue, CGEventType.keyUp.rawValue, CGEventType.flagsChanged.rawValue,
         CGEventType.leftMouseDown.rawValue, CGEventType.leftMouseUp.rawValue, CGEventType.leftMouseDragged.rawValue,
         CGEventType.rightMouseDown.rawValue, CGEventType.rightMouseUp.rawValue, CGEventType.rightMouseDragged.rawValue,

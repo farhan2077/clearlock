@@ -184,7 +184,7 @@ final class Updater {
 
     func installAndRelaunch() {
         guard case .ready(_, let newApp) = state else { return }
-        guard !LockController.shared.isLocked else { return }
+        guard Self.canInstall(isLocked: LockController.shared.isLocked) else { return }
         state = .installing
         do {
             let current = Bundle.main.bundleURL
@@ -199,6 +199,9 @@ final class Updater {
             state = .failed("Couldn’t replace the app. Make sure Clearlock is in a folder you can write to, like Applications.")
         }
     }
+
+    /// Installing quits and relaunches Clearlock, so it never happens while locked.
+    static func canInstall(isLocked: Bool) -> Bool { !isLocked }
 
     // MARK: Menu command
 

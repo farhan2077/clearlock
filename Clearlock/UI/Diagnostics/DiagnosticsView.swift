@@ -34,7 +34,7 @@ struct DiagnosticsView: View {
         HStack(alignment: .firstTextBaseline, spacing: DiagnosticsStyle.cardSpacing) {
             VStack(alignment: .leading, spacing: DiagnosticsStyle.textSpacing) {
                 Text("Clearlock Impact").font(DiagnosticsStyle.pageTitle)
-                Text("Live measurements from the system’s per-process accounting, the same counters Activity Monitor uses.")
+                Text("Live measurements from the system’s per-process accounting, the same counters Activity Monitor uses. They include this window’s own drawing; the Impact Test leaves it out.")
                     .font(DiagnosticsStyle.body)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -73,14 +73,17 @@ struct DiagnosticsView: View {
 
     private var impactTest: some View {
         DiagnosticsCard("Impact Test") {
-            if let progress = monitor.testProgress {
-                ProgressView(value: progress).controlSize(.small).frame(width: 120)
+            if let end = monitor.testEndDate {
+                // Static on purpose: anything animated here would be counted in the test.
+                Text("Measuring until \(end.formatted(date: .omitted, time: .standard))")
+                    .font(DiagnosticsStyle.detail.monospacedDigit())
+                    .foregroundStyle(.secondary)
             } else {
                 Button("Run Test") { monitor.runImpactTest() }
                     .controlSize(.small)
             }
         } content: {
-            Text("Measures Clearlock’s average cost over \(Int(monitor.testDuration)) seconds in its current state. Part of what it measures is this window itself.")
+            Text("Measures Clearlock’s average cost over \(Int(monitor.testDuration)) seconds in its current state. The live charts pause while it runs, so this window’s own drawing isn’t counted.")
                 .font(DiagnosticsStyle.detail)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -90,7 +93,6 @@ struct DiagnosticsView: View {
                     ResultValue(title: "Verdict", value: result.verdict.title, emphasized: true)
                     ResultValue(title: "State", value: result.state)
                     ResultValue(title: "Avg CPU", value: String(format: "%.3f %%", result.averageCPU))
-                    ResultValue(title: "Peak CPU", value: String(format: "%.2f %%", result.peakCPU))
                     ResultValue(title: "Wakeups", value: String(format: "%.1f /s", result.averageWakeups))
                     ResultValue(title: "Energy", value: result.averageMilliwatts.map { String(format: "%.1f mW", $0) } ?? "—")
                     ResultValue(title: "Memory", value: ResourceSample.footprintString(result.memory))

@@ -134,11 +134,19 @@ final class ResourceMonitor {
     struct TestResult {
         let duration: TimeInterval
         let averageCPU: Double
-        let peakCPU: Double
         let averageWakeups: Double
         let averageMilliwatts: Double?
         let memory: UInt64
         let state: String
+
+        /// The result comes only from the readings at the start and end of the test, so
+        /// nothing between them (no sampling, no redrawing) adds to it.
+        static func measured(from start: ResourceSample.Raw, to end: ResourceSample.Raw, state: String) -> TestResult {
+            let total = ResourceSample.between(start, end)
+            return TestResult(duration: end.date.timeIntervalSince(start.date), averageCPU: total.cpuPercent,
+                              averageWakeups: total.wakeupsPerSecond, averageMilliwatts: total.milliwatts,
+                              memory: end.footprint, state: state)
+        }
 
         enum Verdict: Comparable {
             case negligible, veryLow, low, noticeable
@@ -165,12 +173,15 @@ final class ResourceMonitor {
 
     private(set) var samples: [ResourceSample] = []
     private(set) var power = SystemPowerSnapshot()
-    private(set) var testProgress: Double?
+    /// When the running impact test ends; nil when no test is running.
+    private(set) var testEndDate: Date?
     private(set) var testResult: TestResult?
 
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var lastRaw: ResourceSample.Raw?
-    @ObservationIgnored private var testStart: (raw: ResourceSample.Raw, date: Date, peak: Double)?
+    @ObservationIgnored private var testStart: ResourceSample.Raw?
+    @ObservationIgnored private var testTimer: Timer?
+    @ObservationIgnored private var resumesAfterTest = false
     private let historyLength = 120
     let testDuration: TimeInterval = 30
 
@@ -180,6 +191,7 @@ final class ResourceMonitor {
 
     func start() {
         guard timer == nil else { return }
+        if testStart != nil { resumesAfterTest = true; return }
         lastRaw = ResourceSample.readRaw()
         power = SystemPowerSnapshot.current(includeAssertions: true)
         let timer = Timer(timeInterval: 1, repeats: true) { _ in
@@ -190,24 +202,59 @@ final class ResourceMonitor {
         self.timer = timer
     }
 
-    /// True while Diagnostics is sampling (only while its window is open).
+    /// True while Diagnostics samples live (only while its window is open, and paused
+    /// during an impact test).
     var isSampling: Bool { timer != nil }
+
+    var isTesting: Bool { testStart != nil }
 
     func stop() {
         timer?.invalidate()
         timer = nil
+        testTimer?.invalidate()
+        testTimer = nil
         samples = []
         testStart = nil
-        testProgress = nil
+        testEndDate = nil
+        resumesAfterTest = false
     }
 
-    /// Measures average CPU, wakeups and energy over 30 seconds in the current state.
-    /// The Diagnostics window itself is excluded as far as possible by sampling slower.
-    func runImpactTest() {
+    /// Measures average CPU, wakeups and energy over `duration` seconds in the current state.
+    /// Live sampling pauses until it ends, so the charts don't redraw and this window's
+    /// own drawing isn't counted: only one reading at each end and a single timer.
+    func runImpactTest(duration: TimeInterval? = nil) {
         guard testStart == nil, let raw = ResourceSample.readRaw() else { return }
+        let duration = duration ?? testDuration
+        resumesAfterTest = timer != nil
+        timer?.invalidate()
+        timer = nil
         testResult = nil
-        testStart = (raw, Date(), 0)
-        testProgress = 0
+        testStart = raw
+        testEndDate = raw.date.addingTimeInterval(duration)
+        let testTimer = Timer(timeInterval: duration, repeats: false) { _ in
+            MainActor.assumeIsolated { ResourceMonitor.shared.finishImpactTest() }
+        }
+        testTimer.tolerance = 0.2
+        RunLoop.main.add(testTimer, forMode: .common)
+        self.testTimer = testTimer
+    }
+
+    private func finishImpactTest() {
+        testTimer = nil
+        guard let first = testStart else { return }
+        testStart = nil
+        testEndDate = nil
+        if let end = ResourceSample.readRaw() {
+            let state = LockController.shared.isLocked ? "Locked"
+                : AwakeController.shared.isActive ? "Keeping awake" : "Idle"
+            let result = TestResult.measured(from: first, to: end, state: state)
+            testResult = result
+            ActivityLog.shared.add("gauge.with.dots.needle.33percent", "Impact test: \(result.verdict.title.lowercased()) impact")
+        }
+        if resumesAfterTest {
+            resumesAfterTest = false
+            start()
+        }
     }
 
     private func tick() {
@@ -219,24 +266,6 @@ final class ResourceMonitor {
         lastRaw = raw
         if Int(raw.date.timeIntervalSince1970) % 5 == 0 {
             power = SystemPowerSnapshot.current(includeAssertions: true)
-        }
-
-        if let start = testStart {
-            let elapsed = raw.date.timeIntervalSince(start.date)
-            let peak = max(start.peak, samples.last?.cpuPercent ?? 0)
-            testStart = (start.raw, start.date, peak)
-            testProgress = min(elapsed / testDuration, 1)
-            if elapsed >= testDuration {
-                let total = ResourceSample.between(start.raw, raw)
-                let state = LockController.shared.isLocked ? "Locked"
-                    : AwakeController.shared.isActive ? "Keeping awake" : "Idle"
-                testResult = TestResult(duration: elapsed, averageCPU: total.cpuPercent, peakCPU: peak,
-                                        averageWakeups: total.wakeupsPerSecond, averageMilliwatts: total.milliwatts,
-                                        memory: raw.footprint, state: state)
-                testStart = nil
-                testProgress = nil
-                ActivityLog.shared.add("gauge.with.dots.needle.33percent", "Impact test: \(testResult!.verdict.title.lowercased()) impact")
-            }
         }
     }
 }

@@ -53,6 +53,37 @@ struct IdleResourceTests {
         #expect(window.contentViewController == nil)
     }
 
+    @Test("Live sampling pauses during the impact test, so the window doesn't redraw, and resumes after it")
+    func impactTestPausesSampling() async {
+        let monitor = ResourceMonitor.shared
+        monitor.start()
+        defer { monitor.stop() }
+        #expect(monitor.isSampling)
+
+        monitor.runImpactTest(duration: 0.3)
+        let deadline = Date().addingTimeInterval(10)
+        while monitor.isTesting && Date() < deadline {
+            #expect(!monitor.isSampling)
+            #expect(monitor.testEndDate != nil)
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(!monitor.isTesting)
+        #expect(monitor.testResult != nil)
+        #expect(monitor.isSampling)
+    }
+
+    @Test("Closing Diagnostics during the impact test stops everything")
+    func closingDuringImpactTest() async {
+        let monitor = ResourceMonitor.shared
+        monitor.start()
+        monitor.runImpactTest(duration: 0.2)
+        monitor.stop()
+        #expect(!monitor.isTesting)
+        try? await Task.sleep(for: .milliseconds(500))
+        #expect(!monitor.isSampling)
+        #expect(!monitor.isTesting)
+    }
+
     @Test("Permission checks keep running until the last window that needs them closes")
     func pollingCountsWindows() {
         let center = PermissionCenter.shared

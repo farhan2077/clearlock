@@ -26,6 +26,21 @@ struct ResourceTests {
         #expect(ResourceSample.between(a, b).milliwatts == nil)
     }
 
+    @Test("The impact test's result comes only from the readings at its start and end")
+    func impactResultFromEndReadings() {
+        let start = Date(timeIntervalSince1970: 1000)
+        let a = ResourceSample.Raw(date: start, cpuNanos: 2_000_000_000, wakeups: 500,
+                                   energyNanojoules: 50_000_000, footprint: 14_000_000)
+        let b = ResourceSample.Raw(date: start.addingTimeInterval(30), cpuNanos: 2_030_000_000, wakeups: 530,
+                                   energyNanojoules: 59_000_000, footprint: 15_000_000)
+        let result = ResourceMonitor.TestResult.measured(from: a, to: b, state: "Idle")
+        #expect(result.duration == 30)
+        #expect(abs(result.averageCPU - 0.1) < 1e-9)       // 30 ms of CPU over 30 s
+        #expect(result.averageWakeups == 1)                // 30 wakeups over 30 s
+        #expect(result.averageMilliwatts == 0.3)           // 9 mJ over 30 s
+        #expect(result.memory == 15_000_000)
+    }
+
     @Test("The activity log keeps the newest 200 entries, newest first")
     func activityLogIsCapped() {
         let log = ActivityLog.shared

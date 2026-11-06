@@ -103,10 +103,19 @@ struct UnlockCardTests {
     func clickOpensPassword() {
         let card = makeCard()
         defer { close(card) }
-        let click = NSEvent.mouseEvent(with: .leftMouseDown, location: NSPoint(x: UnlockPanel.pillSize.width * 0.65, y: UnlockPanel.pillSize.height / 2), modifierFlags: [],
-                                       timestamp: 0, windowNumber: card.windowNumber, context: nil,
-                                       eventNumber: 0, clickCount: 1, pressure: 1)!
-        card.sendEvent(click)
+        let point = NSPoint(x: UnlockPanel.pillSize.width * 0.65, y: UnlockPanel.pillSize.height / 2)
+        func mouse(_ type: NSEvent.EventType) -> NSEvent {
+            NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: 0,
+                               windowNumber: card.windowNumber, context: nil, eventNumber: 0, clickCount: 1,
+                               pressure: type == .leftMouseDown ? 1 : 0)!
+        }
+        // A whole click: the press opens the password field under the pointer, and the field
+        // then tracks the mouse until the button is released. Without the release queued, that
+        // tracking waits forever (it hung the test on GitHub's runner).
+        NSApp.postEvent(mouse(.leftMouseUp), atStart: false)
+        card.sendEvent(mouse(.leftMouseDown))
+        // Drop the release if nothing tracked it, so it can't reach a later test.
+        _ = NSApp.nextEvent(matching: .leftMouseUp, until: .distantPast, inMode: .default, dequeue: true)
         #expect(card.isPasswordVisible)
     }
 

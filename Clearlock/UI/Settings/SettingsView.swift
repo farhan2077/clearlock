@@ -112,7 +112,9 @@ struct SettingsView: View {
 
         case .keepAwake:
             Section {
-                Toggle(isOn: Binding(get: { prefs.keepAwakeWithLidClosed }, set: setLidMode)) {
+                // A closure, not `set: setLidMode`: passing the method itself crashes the
+                // Swift 6.3 compiler (Xcode 26) while it generates code for this file.
+                Toggle(isOn: Binding(get: { prefs.keepAwakeWithLidClosed }, set: { setLidMode($0) })) {
                     Text("Keep running with the lid closed")
                     Text("While locked. Needs a one-time administrator approval. A closed Mac can get warm, so don’t put it in a bag.")
                 }

@@ -30,8 +30,8 @@ scripts/debug-lock.sh menutest <file>         # chooses Settings… from the rea
 ## Keeping the docs in sync
 
 - **`README.md` is for users and stays short:** the icon, badges (latest release, macOS 26+, app size; no Swift or dependency badges), a one-line pitch, a feature list in plain language, Install, Uninstall, two build commands that point here, and a centered "Built by Farhan Bin Amin" credit line at the end. No implementation details, settings tables, test counts, debug hooks or release steps; those live in this file. **Whenever a change touches anything it mentions, update the README in the same change.** A change isn't done while the README says something the app no longer does.
-  - It covers the features, the shortcut, requirements, the install steps (including "Open Anyway" and Accessibility), uninstalling (including the lid helper), and the idle memory figure.
-  - When resource use changes, measure the Release build again (`footprint`, `top`) instead of guessing, and update both files. Say so when a number couldn't be re-measured, for example anything that needs locking the owner's screen.
+  - It covers the features, the shortcut, requirements, the install steps (including "Open Anyway" and Accessibility), uninstalling (including the lid helper), and that it uses no CPU while idle.
+  - **No memory figures,** in the README or this file (the owner's decision). When CPU or wakeup behavior changes, measure the Release build again (`top`) instead of guessing, and update both files. Say so when something couldn't be re-measured, for example anything that needs locking the owner's screen.
 - **This file is updated the same way** whenever a decision, default or rule changes.
 
 ## Product and platform
@@ -50,8 +50,7 @@ scripts/debug-lock.sh menutest <file>         # chooses Settings… from the rea
 
 ## Resource budget
 
-- **Idle:** about 15 MB, 0% CPU, 0 wakeups.
-- **Locked:** about 17 MB.
+- **Idle:** 0% CPU, 0 wakeups.
 - **No timers or polling while idle.** Timers only exist while something needs them: permission polling only while Settings or Onboarding is open, Diagnostics sampling only while it's open, and while locked only short-lived feedback and wait-countdown timers.
 - **SwiftUI windows are created on demand and fully released on close** (`WindowCoordinator`).
 

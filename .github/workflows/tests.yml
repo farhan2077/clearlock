@@ -28,7 +28,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Clearlock needs the macOS 26 SDK or later, which the runner's default Xcode has.
       - name: Show Xcode version
@@ -44,7 +44,7 @@ jobs:
 
       - name: Keep the log of a failed run
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-log
           path: ${{ runner.temp }}/clearlock-tests.log

@@ -65,7 +65,7 @@ if (( PUBLISH )); then
   [[ $(git rev-parse HEAD) == $(git rev-parse origin/main) ]] || die "main isn't in sync with GitHub; pull or push first"
 
   # Undo the version change if anything fails before it's committed.
-  trap 'git checkout -- "$PBX" 2>/dev/null' EXIT
+  trap 'git checkout -- "$PBX" "$ROOT/README.md" 2>/dev/null' EXIT
   sed -i '' -E "s/MARKETING_VERSION = [^;]+;/MARKETING_VERSION = $VERSION;/" "$PBX"
   sed -i '' -E "s/CURRENT_PROJECT_VERSION = [0-9]+;/CURRENT_PROJECT_VERSION = $BUILD;/" "$PBX"
 fi
@@ -112,7 +112,11 @@ if (( ! PUBLISH )); then
 fi
 
 README="$ROOT/README.md"
-sed -i '' -E "s|badge/app%20size-[0-9.]+%20MB-blue\" alt=\"App size [0-9.]+ MB|badge/app%20size-$APP_SIZE%20MB-blue\" alt=\"App size $APP_SIZE MB|" "$README"
+sed -i '' -E -e "s|badge/app%20size-[0-9.]+%20MB-|badge/app%20size-$APP_SIZE%20MB-|" \
+  -e "s|alt=\"App size [0-9.]+ MB\"|alt=\"App size $APP_SIZE MB\"|" "$README"
+# A badge the pattern no longer matches would silently keep the old size.
+grep -q "badge/app%20size-$APP_SIZE%20MB-" "$README" && grep -q "alt=\"App size $APP_SIZE MB\"" "$README" \
+  || die "couldn't update the app size badge in README.md; its format changed"
 git add "$PBX" "$README"
 git commit --quiet -m "Release $VERSION"
 trap - EXIT

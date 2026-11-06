@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/farhan2077/clearlock/releases/latest"><img src="https://img.shields.io/github/v/release/farhan2077/clearlock?label=release" alt="Latest release"></a>
-  <img src="https://img.shields.io/badge/macOS-26%2B-000000?logo=apple&logoColor=white" alt="macOS 26 or later">
-  <img src="https://img.shields.io/badge/app%20size-2MB-blue" alt="App size 2 MB">
+  <a href="https://github.com/farhan2077/clearlock/releases/latest"><img src="https://img.shields.io/github/v/release/farhan2077/clearlock?label=release&amp;color=D9792B&amp;style=for-the-badge&amp;labelColor=1C1E3A&amp;logo=github&amp;logoColor=white" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/macOS-26%2B-D9792B?style=for-the-badge&amp;labelColor=1C1E3A&amp;logo=apple&amp;logoColor=white" alt="macOS 26 or later">
+  <img src="https://img.shields.io/badge/app%20size-2%20MB-D9792B?style=for-the-badge&amp;labelColor=1C1E3A&amp;logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyLjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI%2BPHBhdGggZD0iTTEyIDN2MTJNNi41IDEwIDEyIDE1LjUgMTcuNSAxME00IDIwaDE2Ii8%2BPC9zdmc%2B" alt="App size 2 MB">
 </p>
 
 Like a glass case: everything stays visible, but nothing can be touched.

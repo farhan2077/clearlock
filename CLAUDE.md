@@ -47,6 +47,7 @@ scripts/debug-lock.sh menutest <file>         # chooses Settings… from the rea
 - **Stack:** Swift 6 with AppKit for the core (menu bar item, lock windows, event tap, hotkeys) and SwiftUI only for Settings, Onboarding and Diagnostics.
 - **No third-party code.** No Sparkle, no packages.
 - **Default actor isolation:** MainActor (`SWIFT_DEFAULT_ACTOR_ISOLATION`). C callbacks are `nonisolated` free functions that hop in with `MainActor.assumeIsolated`.
+- **License:** GPLv3 (the owner chose it over MIT so no one can ship a closed-source copy). `LICENSE` is the unmodified text from gnu.org; don't edit it. The README doesn't mention the license; GitHub shows it in the repo sidebar.
 
 ## Resource budget
 

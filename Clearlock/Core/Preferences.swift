@@ -73,8 +73,9 @@ final class Preferences {
     /// How dark the screen gets while locked, 0 (not at all) to 0.9. 30 % by default.
     var dimLevel: Double { didSet { store.set(dimLevel, forKey: "dimLevel") } }
 
-    /// Tests pass their own UserDefaults suite; the app uses `shared`.
-    init(store d: UserDefaults) {
+    /// Tests pass their own UserDefaults suite; the app uses `shared`. The variant picks the
+    /// default lock shortcut (Clearlock Dev's differs, so both copies can hold one).
+    init(store d: UserDefaults, variant: AppVariant = .current) {
         store = d
         d.register(defaults: [
             "dimLevel": Self.defaultDimLevel,
@@ -82,7 +83,7 @@ final class Preferences {
             "autoCheckForUpdates": true,
         ])
         hasCompletedOnboarding = d.bool(forKey: "hasCompletedOnboarding")
-        lockShortcut = Self.load("lockShortcut", d) ?? (d.object(forKey: "lockShortcut") == nil ? .defaultLock : nil)
+        lockShortcut = Self.load("lockShortcut", d) ?? (d.object(forKey: "lockShortcut") == nil ? variant.defaultLockShortcut : nil)
         tint = LockTint(rawValue: d.string(forKey: "tint") ?? "") ?? .orange
         keepAwakeWithLidClosed = d.bool(forKey: "keepAwakeWithLidClosed")
         lidOnlyOnPower = d.bool(forKey: "lidOnlyOnPower")

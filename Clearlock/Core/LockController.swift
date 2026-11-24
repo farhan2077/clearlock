@@ -68,6 +68,11 @@ final class LockController {
             presentOnboarding()
             return
         }
+        // Two locks at once would each block the typing meant for the other's password field.
+        if Self.isLockedByOtherCopy(windowLevels: Self.otherCopyWindowLevels()) {
+            ActivityLog.shared.add("lock.slash", "Not locked: \(AppVariant.current.other.displayName) is already locked")
+            return
+        }
         let front = NSWorkspace.shared.frontmostApplication
         previousApp = front?.processIdentifier == getpid() ? nil : front
         failedAttempts = []
@@ -153,6 +158,27 @@ final class LockController {
     }
 
     // MARK: Decisions (pure, so they can be unit tested)
+
+    /// Clearlock and Clearlock Dev never lock at the same time. The other copy is locked when
+    /// one of its windows is at the lock overlay's level or above.
+    static func isLockedByOtherCopy(windowLevels: [Int]) -> Bool {
+        windowLevels.contains { $0 >= NSWindow.Level.screenSaver.rawValue }
+    }
+
+    /// Window levels of the other copy's on-screen windows; empty when it isn't running.
+    /// Only checked when locking, so it costs nothing while idle. Reading levels and owners
+    /// needs no Screen Recording permission.
+    private static func otherCopyWindowLevels() -> [Int] {
+        let pids = Set(NSRunningApplication.runningApplications(withBundleIdentifier: AppVariant.current.other.bundleID)
+            .map(\.processIdentifier))
+        guard !pids.isEmpty,
+              let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]
+        else { return [] }
+        return windows.compactMap { info in
+            guard let pid = info[kCGWindowOwnerPID as String] as? pid_t, pids.contains(pid) else { return nil }
+            return info[kCGWindowLayer as String] as? Int
+        }
+    }
 
     /// Without the shield, windows catch everything; with it, only hands are blocked.
     static func mode(shieldStarted: Bool) -> Mode {

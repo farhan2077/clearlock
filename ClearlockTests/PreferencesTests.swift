@@ -7,7 +7,7 @@ struct PreferencesTests {
     @Test("A fresh install uses the agreed defaults")
     func freshInstallDefaults() {
         let suite = IsolatedDefaults()
-        let prefs = Preferences(store: suite.defaults)
+        let prefs = Preferences(store: suite.defaults, variant: .release)
 
         #expect(prefs.lockShortcut == .defaultLock)
         #expect(prefs.cardPosition == .center)

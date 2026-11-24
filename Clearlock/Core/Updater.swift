@@ -35,8 +35,14 @@ final class Updater {
 
     let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
 
-    /// "owner/repo" from Info.plist. Updates are disabled until it's filled in.
-    let repository: String? = Updater.repository(from: Bundle.main.object(forInfoDictionaryKey: "AWLUpdateRepository"))
+    /// "owner/repo" from Info.plist. Updates are disabled until it's filled in, and always in
+    /// Clearlock Dev, which a release would replace.
+    let repository: String? = Updater.repository(from: Bundle.main.object(forInfoDictionaryKey: "AWLUpdateRepository"),
+                                                 variant: .current)
+
+    static func repository(from value: Any?, variant: AppVariant) -> String? {
+        variant.checksForUpdates ? repository(from: value) : nil
+    }
 
     /// "owner/repo", or nil while the placeholder or a malformed value is still in Info.plist.
     static func repository(from value: Any?) -> String? {
@@ -56,7 +62,7 @@ final class Updater {
     /// Lets the system pick an energy-efficient moment roughly once a day.
     func scheduleBackgroundChecks() {
         guard isConfigured else { return }
-        let scheduler = NSBackgroundActivityScheduler(identifier: "com.farhan2077.clearlock.update-check")
+        let scheduler = NSBackgroundActivityScheduler(identifier: AppVariant.current.bundleID + ".update-check")
         scheduler.repeats = true
         scheduler.interval = 24 * 60 * 60
         scheduler.tolerance = 4 * 60 * 60

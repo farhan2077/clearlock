@@ -35,7 +35,7 @@ clean_up() {
 trap clean_up EXIT
 
 stop() {
-  pkill -f "$ROOT/build/DerivedData/Build/Products/Debug/Clearlock.app" 2>/dev/null
+  pkill -f "$ROOT/build/DerivedData/Build/Products/Debug/Clearlock Dev.app" 2>/dev/null
   kill $PID 2>/dev/null
   wait $PID 2>/dev/null
 }

@@ -8,6 +8,7 @@ struct Shortcut: Codable, Equatable {
     var modifiers: UInt          // NSEvent.ModifierFlags raw value (device-independent bits only)
     var key: String              // Display name of the key, e.g. "L" or "F5"
 
+    /// ⇧⌘L, Clearlock's lock shortcut. Clearlock Dev uses its own (`AppVariant.defaultLockShortcut`).
     static let defaultLock = Shortcut(keyCode: UInt32(kVK_ANSI_L), modifiers: [.command, .shift], key: "L")
 
     init(keyCode: UInt32, modifiers: NSEvent.ModifierFlags, key: String) {

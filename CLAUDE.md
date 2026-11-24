@@ -7,17 +7,19 @@ The decisions below were made with the owner and are final. Don't reverse or "im
 ## Commands
 
 ```bash
-scripts/build.sh --run          # Release build, signed with the self-signed cert, launched
-scripts/build.sh debug --run    # Debug build with Terminal hooks (scripts/debug-lock.sh)
+scripts/build.sh debug --run    # Clearlock Dev (build/Clearlock Dev.app, Debug, Terminal hooks): try every change here
+scripts/build.sh                # Release build (build/Clearlock.app), signed with the self-signed cert, not launched
+scripts/build.sh --run          # Same, launched: quits the installed Clearlock too, so only when the owner asks
 scripts/test.sh                 # Unit tests (must pass before any change is done)
 scripts/release.sh 1.1.0        # Dry run: test, build, package .dmg and .zip; changes and publishes nothing
 scripts/release.sh 1.1.0 --publish   # Only with the owner's go-ahead for that version
 ```
 
 - **First build:** `scripts/build.sh` runs `scripts/setup-signing.sh`, which creates the self-signed certificate in `.signing/` if it's missing.
+- **Develop in Clearlock Dev, never in production.** Every Debug build is a separate app, **Clearlock Dev**, that runs next to the installed Clearlock and shares nothing with it (see "Clearlock Dev" below). `debug --run` only quits and relaunches Clearlock Dev.
 - **Xcode:** `Clearlock.xcodeproj` opens fine, but Cmd-R signs ad hoc, so Accessibility permission resets with each Xcode build. Use the scripts when testing the Shield.
-- **Window focus trace** (Debug builds only, `DebugTrace`): menu open and close, Settings… firing, activation and every titled window's key and visibility changes go to the system log. Read them with `log show --last 10m --predicate 'subsystem == "com.farhan2077.clearlock" AND category == "trace"' --style compact`. `menutest` clicks the menu bar icon for real when the build may post events, otherwise it drives the same menu from inside the app.
-- **Debug hooks** (Debug builds only; they also let you release a lock from Terminal or over SSH):
+- **Window focus trace** (Debug builds only, `DebugTrace`): menu open and close, Settings… firing, activation and every titled window's key and visibility changes go to the system log. Read them with `log show --last 10m --predicate 'subsystem == "com.farhan2077.clearlock.dev" AND category == "trace"' --style compact`. `menutest` clicks the menu bar icon for real when the build may post events, otherwise it drives the same menu from inside the app.
+- **Debug hooks** (Debug builds only, so they talk to Clearlock Dev; they also let you release a lock from Terminal or over SSH):
 
 ```bash
 scripts/debug-lock.sh lock                    # or: unlock, settings, settings-general, settings-advanced, diagnostics, about, onboarding
@@ -42,12 +44,34 @@ scripts/debug-lock.sh menutest <file>         # chooses Settings… from the rea
 - **Protected identifiers, never change:**
   - **Bundle ID `com.farhan2077.clearlock`.** Accessibility permission, the settings domain, Open at Login and the updater's signature check are keyed to it; changing it after a release resets every user's permission and breaks their updates. The test bundle is `com.farhan2077.clearlock.tests`. The owner chose it before the first release; it replaced `com.clearlock.ClearLock`, which was only ever on the owner's Mac.
   - **Signing certificate name `ClearLock Self-Signed`** in `.signing/`. Updates and permissions trust that certificate. Its old capitalization is deliberate.
-  - Debug notification names use the bundle ID as a prefix (`com.farhan2077.clearlock.debug.*`).
+  - **Clearlock Dev's bundle ID `com.farhan2077.clearlock.dev`** (Debug configuration only; the owner asked for it so dev builds run side by side with the release). Release builds must never use it, and Debug builds must never use the release's ID; `scripts/build.sh` refuses a build whose bundle ID doesn't match its configuration.
+  - Debug notification names use the bundle ID as a prefix (`com.farhan2077.clearlock.dev.debug.*`, since only Debug builds have the hooks).
 - **Platform:** macOS 26 or later.
 - **Stack:** Swift 6 with AppKit for the core (menu bar item, lock windows, event tap, hotkeys) and SwiftUI only for Settings, Onboarding and Diagnostics.
 - **No third-party code.** No Sparkle, no packages.
 - **Default actor isolation:** MainActor (`SWIFT_DEFAULT_ACTOR_ISOLATION`). C callbacks are `nonisolated` free functions that hop in with `MainActor.assumeIsolated`.
 - **License:** GPLv3 (the owner chose it over MIT so no one can ship a closed-source copy). `LICENSE` is the unmodified text from gnu.org; don't edit it. The README doesn't mention the license; GitHub shows it in the repo sidebar.
+
+## Clearlock Dev
+
+Debug builds are **Clearlock Dev** (`AppVariant`, picked by the bundle ID the build configuration sets). The owner runs the dev build and the installed release at the same time, with **every setting and behavior separate**, so a change in one never affects the other.
+
+**Workflow (the owner's decision):**
+- **Changes are seen in Clearlock Dev only.** Every new feature or change to an existing one is built and tried with `scripts/build.sh debug --run`, and checked there (debug hooks, `snapshot`, the menu bar icon with the hammer).
+- **The installed Clearlock (`/Applications/Clearlock.app`) is production.** It's how the owner sees that the released app works. It changes only through a published release, which it installs itself. While developing, never quit, replace or relaunch it: don't run `scripts/build.sh --run` (it quits every process named Clearlock, the installed one included, and launches `build/Clearlock.app` in its place), and never copy a build into `/Applications`. Building Release without `--run` is fine; `scripts/release.sh` does that.
+- **Both are built from the same code.** Only the build configuration differs, so a change shows up in Dev right away and reaches production with the next release, never before.
+- **Keep it separate.** Anything new that lives outside the process (a file or folder, a defaults domain, a system setting or helper, a global shortcut, a notification name, a log subsystem, a background-task ID, a permission) is keyed to `AppVariant` so the two copies never share it, and gets a test in `AppVariantTests`.
+
+**What's separate:**
+
+- **Own identity:** bundle ID `com.farhan2077.clearlock.dev`, app and executable `Clearlock Dev` (`PRODUCT_NAME`; the Swift module stays `Clearlock` via `PRODUCT_MODULE_NAME`), shown as "Clearlock Dev" in the menu bar tooltip, VoiceOver label, About and Quit items. Same signing certificate.
+- **Own settings and backup:** its own defaults domain (the bundle ID) and `~/.config/clearlock-dev/settings.plist`. It never reads or writes the release's settings.
+- **Own permissions:** its own Accessibility entry and Open at Login item (both keyed to the bundle ID). The stale-permission repair only ever resets the running copy's own entry.
+- **Own lid helper:** `/etc/sudoers.d/clearlock-dev`, installed with its own admin prompt. `pmset disablesleep` itself is system-wide, but only a locked copy uses it, and the two never lock at once.
+- **Own default lock shortcut: ⌃⇧⌘L** (the release keeps ⇧⌘L), so both can hold one.
+- **No updates:** the updater is off (`Updater.repository(from:variant:)` is nil), so Check for Updates… is disabled; a release would otherwise replace it.
+- **Never two locks at once:** each copy's shield would block the typing meant for the other's card. A copy doesn't lock while the other copy has a window at the lock overlay's level or above (`LockController.isLockedByOtherCopy`, checked only when locking, via the window list, no permission needed); it logs "Not locked" instead. The installed release only gets this check from the first release that includes it.
+- **Menu bar icon:** the same lock with a small hammer beside it, unlocked (template, follows the menu bar) and inside the locked pill (`StatusItemController.image(for:tint:variant:)`). The release's icon is unchanged.
 
 ## Resource budget
 
@@ -115,7 +139,7 @@ scripts/debug-lock.sh menutest <file>         # chooses Settings… from the rea
 
 ## Menu bar
 
-- **Icon:** always a lock. Open lock (`lock.open`) while unlocked (no cup, no dimming). White lock on a pill in the chosen tint while locked. Keep Awake shows only in the tooltip and VoiceOver label.
+- **Icon:** always a lock (Clearlock Dev adds a small hammer, see "Clearlock Dev"). Open lock (`lock.open`) while unlocked (no cup, no dimming). White lock on a pill in the chosen tint while locked. Keep Awake shows only in the tooltip and VoiceOver label.
 - **Clicking the icon always opens the menu.** There's no "click to lock" option.
 - **Menu items, only:** Lock Now (Unlock… while locked, Finish Setup to Lock… while the welcome guide is open), Settings…, Check for Updates… (Restart to Update once an update is downloaded), About, Quit (disabled while locked). `StatusItemController.menuEntries` decides this.
 - **About:** the standard About window with the tagline "Lock your Mac without stopping your work." and "Built by Farhan Bin Amin · GitHub", the name linking to https://farhanbinamin.com and GitHub to https://github.com/farhan2077/clearlock (`WindowCoordinator.aboutCredits`). The hidden main menu's About item opens the same window.
@@ -158,7 +182,7 @@ Two small page dots sit between the buttons (`OnboardingView.primaryButton`, `On
 
 ## Lid closed
 
-- **Opt-in.** A one-time admin prompt installs `/etc/sudoers.d/clearlock`, which allows exactly `pmset -a disablesleep 1` and `0` for this user. Nothing else runs as root.
+- **Opt-in.** A one-time admin prompt installs `/etc/sudoers.d/clearlock` (Clearlock Dev: `/etc/sudoers.d/clearlock-dev`), which allows exactly `pmset -a disablesleep 1` and `0` for this user. Nothing else runs as root.
 - **"Only when connected to power"** is on by default.
 - **If the app quit while lid sleep was disabled,** it's restored on the next launch.
 - **The helper is never removed from the app.** Turning the mode off just stops using it. To remove it by hand: `sudo rm /etc/sudoers.d/clearlock`.
@@ -171,9 +195,9 @@ Two small page dots sit between the buttons (`OnboardingView.primaryButton`, `On
 
 ## Testing rules
 
-- **Swift Testing**, in `ClearlockTests/`. The app is the test host but starts nothing under XCTest (`main.swift`): no status item, no hotkeys, no lock, no real settings.
+- **Swift Testing**, in `ClearlockTests/`. The app (a Debug build, so Clearlock Dev) is the test host but starts nothing under XCTest (`main.swift`): no status item, no hotkeys, no lock, no real settings.
 - **Test behavior, not copy.** Never assert UI strings or that a label exists.
-  - Pull decisions into pure functions and test those (`InputShield.decide`, `LockController.throttleDelay`, `LockController.mode`, `LockController.agentTarget`, `LockController.eventRect`, `LockController.kioskOptions`, `PowerAssertions.needed`, `AwakeController.startsAtLaunch`, `StatusItemController.icon`, `AppDelegate.terminateReply`, `Updater.evaluate`, `Updater.repository(from:)`, `LidSleepManager.sudoersRule`, `LidSleepManager.shouldEngage`, `SettingsBackup.shouldReRegisterLoginItem`, `UnlockPanel.startsTyping`, `UnlockPanel.frame(for:in:topInset:)`, `ResourceMonitor.TestResult.verdict`, `ResourceMonitor.TestResult.measured`, `WindowCoordinator.centeredOrigin`, `StatusItemController.menuEntries`, `LockController.focusAction`, `LockController.reportsFailures`, `OnboardingView.finishButton`, `OnboardingView.primaryButton`, `OnboardingView.showsBack`, `CardPosition.at(gridRow:gridColumn:)`, `ShortcutRecorder.showsReset`, `SettingsView.lidPowerToggle`, `PermissionCenter.staleAccessibilityReset`, `Updater.canInstall`, `InputShield.blockedTypes`, `AppDelegate.makeMainMenu`).
+  - Pull decisions into pure functions and test those (`InputShield.decide`, `LockController.throttleDelay`, `LockController.mode`, `LockController.agentTarget`, `LockController.eventRect`, `LockController.kioskOptions`, `PowerAssertions.needed`, `AwakeController.startsAtLaunch`, `StatusItemController.icon`, `AppDelegate.terminateReply`, `Updater.evaluate`, `Updater.repository(from:)`, `LidSleepManager.sudoersRule`, `LidSleepManager.shouldEngage`, `SettingsBackup.shouldReRegisterLoginItem`, `UnlockPanel.startsTyping`, `UnlockPanel.frame(for:in:topInset:)`, `ResourceMonitor.TestResult.verdict`, `ResourceMonitor.TestResult.measured`, `WindowCoordinator.centeredOrigin`, `StatusItemController.menuEntries`, `LockController.focusAction`, `LockController.reportsFailures`, `OnboardingView.finishButton`, `OnboardingView.primaryButton`, `OnboardingView.showsBack`, `CardPosition.at(gridRow:gridColumn:)`, `ShortcutRecorder.showsReset`, `SettingsView.lidPowerToggle`, `PermissionCenter.staleAccessibilityReset`, `Updater.canInstall`, `InputShield.blockedTypes`, `AppDelegate.makeMainMenu`, `AppVariant`, `LockController.isLockedByOtherCopy`, `Updater.repository(from:variant:)`, `StatusItemController.image(for:tint:variant:)`). Tests that depend on the release's values (like ⇧⌘L) pass `variant: .release` instead of relying on the test host.
   - Real input goes through `InputShield.shouldPass` with `CGEvent`s whose source PID is set (0 for hands, any other PID for agents). Never start the tap in tests.
 - **Every feature and every decision in this file has a test.** A change to behavior ships with a test that fails without it. Before finishing, break the behavior on purpose once and confirm a test catches it, then restore the code.
 - **Not unit-tested on purpose** (needs a person or changes the Mac): real Touch ID, checking the real login password (repeated wrong attempts could count against the account), registering global hotkeys, taking power assertions, the lid-closed helper's admin prompt, and Open at Login registration. Their decisions are tested as pure functions instead. `LidSleepManager` takes a fake `pmset` and its own defaults in tests, so recovery after a crash is tested without touching the Mac.

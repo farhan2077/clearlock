@@ -100,7 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let center = DistributedNotificationCenter.default()
         // Clicks the real menu bar icon and chooses Settings… with the keyboard, like a person,
         // then writes what happened to the Settings window. Needs Accessibility to post events.
-        center.addObserver(forName: Notification.Name("com.farhan2077.clearlock.debug.menutest"), object: nil, queue: .main) { [weak self] note in
+        center.addObserver(forName: Notification.Name(AppVariant.current.debugNotificationPrefix + "menutest"), object: nil, queue: .main) { [weak self] note in
             let path = note.object as? String ?? NSTemporaryDirectory() + "clearlock-menutest.txt"
             let forceInApp = note.userInfo?["inApp"] != nil
             MainActor.assumeIsolated {
@@ -150,15 +150,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
-        center.addObserver(forName: Notification.Name("com.farhan2077.clearlock.debug.lock"), object: nil, queue: .main) { _ in
+        center.addObserver(forName: Notification.Name(AppVariant.current.debugNotificationPrefix + "lock"), object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { LockController.shared.lock(source: "debug") }
         }
-        center.addObserver(forName: Notification.Name("com.farhan2077.clearlock.debug.unlock"), object: nil, queue: .main) { _ in
+        center.addObserver(forName: Notification.Name(AppVariant.current.debugNotificationPrefix + "unlock"), object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { LockController.shared.debugUnlock() }
         }
         // Builds an invisible unlock pill, opens the password field and records whether the
         // pill or the fingerprint moved. Nothing is locked.
-        center.addObserver(forName: Notification.Name("com.farhan2077.clearlock.debug.cardtest"), object: nil, queue: .main) { note in
+        center.addObserver(forName: Notification.Name(AppVariant.current.debugNotificationPrefix + "cardtest"), object: nil, queue: .main) { note in
             let path = note.object as? String ?? NSTemporaryDirectory() + "clearlock-cardtest.txt"
             MainActor.assumeIsolated {
                 let card = UnlockPanel(controller: LockController.shared)
@@ -174,14 +174,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 card.orderOut(nil)
             }
         }
-        center.addObserver(forName: Notification.Name("com.farhan2077.clearlock.debug.status"), object: nil, queue: .main) { note in
+        center.addObserver(forName: Notification.Name(AppVariant.current.debugNotificationPrefix + "status"), object: nil, queue: .main) { note in
             let path = note.object as? String ?? NSTemporaryDirectory() + "clearlock-status.txt"
             MainActor.assumeIsolated {
                 try? LockController.shared.debugStatus.write(toFile: path, atomically: true, encoding: .utf8)
             }
         }
         // Renders every visible window into PNGs in the given folder, for layout review.
-        center.addObserver(forName: Notification.Name("com.farhan2077.clearlock.debug.snapshot"), object: nil, queue: .main) { note in
+        center.addObserver(forName: Notification.Name(AppVariant.current.debugNotificationPrefix + "snapshot"), object: nil, queue: .main) { note in
             let folder = note.object as? String ?? NSTemporaryDirectory()
             MainActor.assumeIsolated {
                 for (index, window) in NSApp.windows.enumerated() where window.isVisible {
@@ -193,7 +193,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
-        center.addObserver(forName: Notification.Name("com.farhan2077.clearlock.debug.window"), object: nil, queue: .main) { note in
+        center.addObserver(forName: Notification.Name(AppVariant.current.debugNotificationPrefix + "window"), object: nil, queue: .main) { note in
             let target = note.object as? String
             MainActor.assumeIsolated {
                 switch target {

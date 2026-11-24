@@ -11,7 +11,8 @@ import Observation
 final class LidSleepManager {
     static let shared = LidSleepManager()
 
-    static let rulePath = "/etc/sudoers.d/clearlock"
+    /// Clearlock Dev has its own rule (`/etc/sudoers.d/clearlock-dev`).
+    static let rulePath = AppVariant.current.lidHelperPath
     /// Saved while lid sleep is disabled, so a crash or quit can be undone at the next launch.
     static let engagedKey = "lidSleepEngaged"
 
@@ -72,7 +73,7 @@ final class LidSleepManager {
         /usr/sbin/visudo -cf "$T" >/dev/null && /bin/mkdir -p /etc/sudoers.d && \
         /usr/bin/install -m 0440 -o root -g wheel "$T" \(Self.rulePath); R=$?; /bin/rm -f "$T"; exit $R
         """
-        let ok = await runAsAdmin(script, prompt: "Clearlock wants to allow keeping your Mac awake with the lid closed.")
+        let ok = await runAsAdmin(script, prompt: "\(AppVariant.current.displayName) wants to allow keeping your Mac awake with the lid closed.")
         refreshInstalled()
         return ok && isHelperInstalled
     }

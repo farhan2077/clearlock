@@ -3,9 +3,9 @@ import AppKit
 import os
 
 /// Debug builds log window and activation events, to diagnose focus problems from real
-/// clicks: `log show --predicate 'subsystem == "com.farhan2077.clearlock" AND category == "trace"'`.
+/// clicks: `log show --predicate 'subsystem == "com.farhan2077.clearlock.dev" AND category == "trace"'`.
 enum DebugTrace {
-    private static let logger = Logger(subsystem: "com.farhan2077.clearlock", category: "trace")
+    private static let logger = Logger(subsystem: AppVariant.current.bundleID, category: "trace")
     private static var observers: [NSObjectProtocol] = []
 
     static func note(_ message: String) {

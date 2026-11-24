@@ -72,7 +72,7 @@ struct SettingsView: View {
                     }
                 }
                 LabeledContent("Lock shortcut") {
-                    ShortcutRecorder(shortcut: $prefs.lockShortcut, defaultShortcut: .defaultLock,
+                    ShortcutRecorder(shortcut: $prefs.lockShortcut, defaultShortcut: AppVariant.current.defaultLockShortcut,
                                      conflict: hotKeys.failures.contains(.lock))
                 }
                 LabeledContent("Lock color") {

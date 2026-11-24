@@ -250,7 +250,7 @@
 				ENABLE_HARDENED_RUNTIME = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Clearlock;
+				INFOPLIST_KEY_CFBundleDisplayName = "Clearlock Dev";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -259,8 +259,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0.3;
-				PRODUCT_BUNDLE_IDENTIFIER = com.farhan2077.clearlock;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.farhan2077.clearlock.dev;
+				PRODUCT_MODULE_NAME = Clearlock;
+				PRODUCT_NAME = "Clearlock Dev";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -315,7 +316,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_VERSION = 6.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Clearlock.app/Contents/MacOS/Clearlock";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Clearlock Dev.app/Contents/MacOS/Clearlock Dev";
 			};
 			name = Debug;
 		};

@@ -1,16 +1,17 @@
 import Foundation
 import ServiceManagement
 
-/// Keeps a copy of Clearlock's settings at ~/.config/clearlock/settings.plist.
+/// Keeps a copy of Clearlock's settings at ~/.config/clearlock/settings.plist
+/// (Clearlock Dev: ~/.config/clearlock-dev/settings.plist).
 ///
 /// Dragging an app to the Trash leaves its preferences in ~/Library, but uninstaller
 /// apps (AppCleaner, CleanMyMac…) delete them. The copy lives outside ~/Library so a
 /// reinstall picks up where the user left off, including Open at Login.
 enum SettingsBackup {
     static let fileURL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/clearlock/settings.plist")
+        .appendingPathComponent(AppVariant.current.settingsBackupPath)
 
-    static let domain = Bundle.main.bundleIdentifier ?? "com.farhan2077.clearlock"
+    static let domain = Bundle.main.bundleIdentifier ?? AppVariant.current.bundleID
     private static var saveScheduled = false
 
     /// Call before anything reads settings. Returns true if settings were restored.

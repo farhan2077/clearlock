@@ -1,16 +1,20 @@
 #!/bin/zsh
 # Builds Clearlock and signs it with the stable self-signed identity.
-#   scripts/build.sh            Release build → build/Clearlock.app
-#   scripts/build.sh debug      Debug build (includes Terminal test hooks)
-#   scripts/build.sh --run      Build, quit the running copy, and launch the new one
+#   scripts/build.sh            Release build → build/Clearlock.app (com.farhan2077.clearlock)
+#   scripts/build.sh debug      Debug build → build/Clearlock Dev.app (com.farhan2077.clearlock.dev),
+#                               a separate app with its own settings and permissions, plus Terminal test hooks
+#   scripts/build.sh --run      Build, quit the running copy of that same app, and launch the new one
+# Clearlock and Clearlock Dev run side by side; --run never quits the other one.
 set -euo pipefail
 
 ROOT=${0:A:h:h}
 CONFIG=Release
+NAME=Clearlock
+BUNDLE_ID=com.farhan2077.clearlock
 RUN=0
 for arg in "$@"; do
   case $arg in
-    debug) CONFIG=Debug ;;
+    debug) CONFIG=Debug; NAME="Clearlock Dev"; BUNDLE_ID=com.farhan2077.clearlock.dev ;;
     --run) RUN=1 ;;
   esac
 done
@@ -29,9 +33,17 @@ xcodebuild -project "$ROOT/Clearlock.xcodeproj" -scheme Clearlock -configuration
   -derivedDataPath "$ROOT/build/DerivedData" -destination "generic/platform=macOS" \
   -quiet build "${OVERRIDES[@]}"
 
-APP="$ROOT/build/Clearlock.app"
+APP="$ROOT/build/$NAME.app"
 rm -rf "$APP"
-ditto "$ROOT/build/DerivedData/Build/Products/$CONFIG/Clearlock.app" "$APP"
+ditto "$ROOT/build/DerivedData/Build/Products/$CONFIG/$NAME.app" "$APP"
+
+# The release's bundle ID is protected (Accessibility, settings and updates are keyed to it),
+# and Dev must never share it, or the two copies would overwrite each other's settings.
+BUILT_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP/Contents/Info.plist")
+if [[ $BUILT_ID != "$BUNDLE_ID" ]]; then
+  echo "error: $APP has bundle ID $BUILT_ID, expected $BUNDLE_ID" >&2
+  exit 1
+fi
 
 security unlock-keychain -p clearlock "$KEYCHAIN"
 codesign --force --options runtime --timestamp=none --keychain "$KEYCHAIN" -s "$IDENTITY" "$APP"
@@ -39,6 +51,6 @@ codesign --verify --strict "$APP"
 echo "Built and signed $APP ($CONFIG)"
 
 if (( RUN )); then
-  pkill -x Clearlock 2>/dev/null && sleep 0.5 || true
+  pkill -x "$NAME" 2>/dev/null && sleep 0.5 || true
   open "$APP"
 fi

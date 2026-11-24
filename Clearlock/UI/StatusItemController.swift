@@ -63,18 +63,19 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let prefs = Preferences.shared
         guard let button = item.button else { return }
 
-        switch Self.icon(isLocked: lock.isLocked, keepAwake: awake.isActive) {
+        let icon = Self.icon(isLocked: lock.isLocked, keepAwake: awake.isActive)
+        let name = AppVariant.current.displayName
+        button.image = Self.image(for: icon, tint: prefs.tint.color, variant: .current)
+        switch icon {
         case .locked:
-            button.image = Self.lockedImage(tint: prefs.tint.color)
-            button.setAccessibilityLabel("Clearlock, locked")
-            button.toolTip = "Clearlock: Locked"
+            button.setAccessibilityLabel("\(name), locked")
+            button.toolTip = "\(name): Locked"
         case .unlocked:
-            button.image = Self.symbol("lock.open")
             // Keep Awake doesn't change the icon; it's still spoken and shown in the tooltip.
-            button.setAccessibilityLabel(awake.isActive ? "Clearlock, keeping awake" : "Clearlock")
+            button.setAccessibilityLabel(awake.isActive ? "\(name), keeping awake" : name)
             button.toolTip = awake.isActive
-                ? "Keeping awake"
-                : "Clearlock"
+                ? (AppVariant.current == .dev ? "\(name): Keeping awake" : "Keeping awake")
+                : name
         }
     }
 
@@ -86,6 +87,16 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         isLocked ? .locked : .unlocked
     }
 
+    /// The menu bar image. Clearlock Dev adds a small hammer beside the lock (`AppVariant.badgesMenuBarIcon`),
+    /// so it's told apart from the installed Clearlock; the lock itself is the same.
+    static func image(for icon: Icon, tint: NSColor, variant: AppVariant) -> NSImage {
+        let badged = variant.badgesMenuBarIcon
+        switch icon {
+        case .unlocked: return badged ? badgedSymbol("lock.open") : symbol("lock.open")
+        case .locked: return lockedImage(tint: tint, badged: badged)
+        }
+    }
+
     private static func symbol(_ name: String) -> NSImage {
         let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
             .withSymbolConfiguration(.init(pointSize: 14, weight: .medium)) ?? NSImage()
@@ -93,16 +104,43 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         return image
     }
 
-    private static func lockedImage(tint: NSColor) -> NSImage {
-        let size = NSSize(width: 30, height: 18)
+    private static func hammer(pointSize: CGFloat, color: NSColor? = nil) -> NSImage {
+        var config = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .bold)
+        if let color { config = config.applying(.init(paletteColors: [color])) }
+        return NSImage(systemSymbolName: "hammer.fill", accessibilityDescription: nil)?.withSymbolConfiguration(config) ?? NSImage()
+    }
+
+    /// A template image, so it follows the menu bar's light or dark look like the plain lock.
+    private static func badgedSymbol(_ name: String) -> NSImage {
+        let lock = symbol(name)
+        let badge = hammer(pointSize: 8)
+        let gap: CGFloat = 1
+        let size = NSSize(width: lock.size.width + gap + badge.size.width, height: lock.size.height)
+        let image = NSImage(size: size, flipped: false) { _ in
+            lock.draw(in: NSRect(origin: .zero, size: lock.size))
+            badge.draw(in: NSRect(origin: NSPoint(x: lock.size.width + gap, y: 0), size: badge.size))
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }
+
+    private static func lockedImage(tint: NSColor, badged: Bool) -> NSImage {
+        let size = NSSize(width: badged ? 40 : 30, height: 18)
         let image = NSImage(size: size, flipped: false) { rect in
             tint.setFill()
             NSBezierPath(roundedRect: rect, xRadius: 9, yRadius: 9).fill()
             let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .bold)
                 .applying(.init(paletteColors: [.white]))
-            if let lock = NSImage(systemSymbolName: "lock.fill", accessibilityDescription: nil)?.withSymbolConfiguration(config) {
-                let s = lock.size
-                lock.draw(in: NSRect(x: (rect.width - s.width) / 2, y: (rect.height - s.height) / 2, width: s.width, height: s.height))
+            guard let lock = NSImage(systemSymbolName: "lock.fill", accessibilityDescription: nil)?.withSymbolConfiguration(config) else { return true }
+            let badge = badged ? hammer(pointSize: 8, color: .white) : nil
+            let gap: CGFloat = badge == nil ? 0 : 2
+            let total = lock.size.width + gap + (badge?.size.width ?? 0)
+            let x = (rect.width - total) / 2
+            lock.draw(in: NSRect(x: x, y: (rect.height - lock.size.height) / 2, width: lock.size.width, height: lock.size.height))
+            if let badge {
+                badge.draw(in: NSRect(x: x + lock.size.width + gap, y: (rect.height - badge.size.height) / 2,
+                                      width: badge.size.width, height: badge.size.height))
             }
             return true
         }
@@ -159,9 +197,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                 update.isEnabled = enabled
                 menu.addItem(update)
             case .about:
-                menu.addItem(action("About Clearlock", nil) { WindowCoordinator.shared.showAbout() })
+                menu.addItem(action("About \(AppVariant.current.displayName)", nil) { WindowCoordinator.shared.showAbout() })
             case .quit(let enabled):
-                let quit = action("Quit Clearlock", nil) { NSApp.terminate(nil) }
+                let quit = action("Quit \(AppVariant.current.displayName)", nil) { NSApp.terminate(nil) }
                 quit.keyEquivalent = "q"
                 quit.isEnabled = enabled
                 menu.addItem(quit)

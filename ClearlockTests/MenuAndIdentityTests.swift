@@ -4,14 +4,15 @@ import Testing
 
 @Suite("Identity and menu bar", .serialized)
 struct MenuAndIdentityTests {
-    @Test("The bundle ID stays com.farhan2077.clearlock, which Accessibility, settings and updates are keyed to")
+    @Test("The release's bundle ID stays com.farhan2077.clearlock, which Accessibility, settings and updates are keyed to")
     func bundleIdentifierIsProtected() {
-        #expect(Bundle.main.bundleIdentifier == "com.farhan2077.clearlock")
+        #expect(AppVariant.releaseBundleID == "com.farhan2077.clearlock")
+        #expect(Bundle.main.bundleIdentifier == AppVariant.current.bundleID)
     }
 
-    @Test("Settings are stored and backed up under the bundle ID")
+    @Test("Settings are stored and backed up under the running copy's bundle ID")
     func settingsDomainFollowsBundleID() {
-        #expect(SettingsBackup.domain == "com.farhan2077.clearlock")
+        #expect(SettingsBackup.domain == Bundle.main.bundleIdentifier)
     }
 
     @Test("Updates come from farhan2077/clearlock")

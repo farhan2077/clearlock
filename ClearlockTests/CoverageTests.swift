@@ -232,15 +232,15 @@ struct UnlockCardKeyTests {
         #expect(card.showsLockSymbol)
     }
 
-    @Test("Return on the Touch ID card opens the password field")
-    func returnOpensPassword() {
+    @Test("Return on the Touch ID card doesn't open the password field or submit anything")
+    func returnKeepsTouchID() {
         let card = makeCard()
         defer { close(card) }
         card.sendEvent(key("\r", kVK_Return, in: card))
-        #expect(card.isPasswordVisible)
+        #expect(!card.isPasswordVisible)
     }
 
-    @Test("After Escape goes back to Touch ID, typing opens the field again and keeps the keystroke")
+    @Test("After Escape goes back to Touch ID, typing stays ignored until the pill is clicked again")
     func escapeThenTypeAgain() {
         let card = makeCard()
         defer { close(card) }
@@ -248,7 +248,9 @@ struct UnlockCardKeyTests {
         card.sendEvent(key("\u{1B}", kVK_Escape, in: card))
         #expect(!card.isPasswordVisible)
         card.sendEvent(key("b", kVK_ANSI_B, in: card))
-        #expect(card.isPasswordVisible)
+        #expect(!card.isPasswordVisible)
+        card.revealPassword()
+        card.sendEvent(key("b", kVK_ANSI_B, in: card))
         #expect(card.typedCharacterCount == 1)
     }
 }

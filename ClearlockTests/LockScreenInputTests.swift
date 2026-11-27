@@ -27,15 +27,30 @@ struct LockScreenInputTests {
                          charactersIgnoringModifiers: characters, isARepeat: false, keyCode: UInt16(keyCode))!
     }
 
-    @Test("Typing on the Touch ID card opens the password field and keeps the first keystroke")
-    func typingRevealsPasswordAndKeepsKeystroke() {
+    @Test("Typing on the Touch ID card never opens the password field, so stray keys can't use up attempts")
+    func typingNeverRevealsPassword() {
         let card = makeCard()
         defer { close(card) }
         #expect(!card.isPasswordVisible)
 
-        card.sendEvent(keyDown("a", keyCode: kVK_ANSI_A, window: card))
+        let keys: [(String, Int, NSEvent.ModifierFlags)] = [
+            ("a", kVK_ANSI_A, []), ("7", kVK_ANSI_7, []), ("A", kVK_ANSI_A, .shift), (" ", kVK_Space, []),
+            ("\r", kVK_Return, []), ("\u{3}", kVK_ANSI_KeypadEnter, []), ("\t", kVK_Tab, []),
+            ("\u{F702}", kVK_LeftArrow, []), ("v", kVK_ANSI_V, .command),
+        ]
+        for (characters, keyCode, modifiers) in keys {
+            card.sendEvent(keyDown(characters, keyCode: keyCode, modifiers: modifiers, window: card))
+            #expect(!card.isPasswordVisible)
+        }
+        #expect(card.typedCharacterCount == 0)
+    }
 
-        #expect(card.isPasswordVisible)
+    @Test("Once the password field is open, typing goes into it")
+    func typingAfterOpening() {
+        let card = makeCard()
+        defer { close(card) }
+        card.revealPassword()
+        card.sendEvent(keyDown("a", keyCode: kVK_ANSI_A, window: card))
         #expect(card.typedCharacterCount == 1)
     }
 
@@ -43,6 +58,7 @@ struct LockScreenInputTests {
     func escapeReturnsToTouchID() {
         let card = makeCard()
         defer { close(card) }
+        card.revealPassword()
         card.sendEvent(keyDown("a", keyCode: kVK_ANSI_A, window: card))
         card.sendEvent(keyDown("\u{1B}", keyCode: kVK_Escape, window: card))
         #expect(card.isPasswordVisible)          // "a" is still typed
@@ -52,23 +68,6 @@ struct LockScreenInputTests {
         empty.revealPassword()
         empty.sendEvent(keyDown("\u{1B}", keyCode: kVK_Escape, window: empty))
         #expect(!empty.isPasswordVisible)
-    }
-
-    @Test("Letters, digits and Return count as typing a password")
-    func typingKeys() {
-        #expect(UnlockPanel.startsTyping(keyDown("a", keyCode: kVK_ANSI_A)))
-        #expect(UnlockPanel.startsTyping(keyDown("7", keyCode: kVK_ANSI_7)))
-        #expect(UnlockPanel.startsTyping(keyDown("A", keyCode: kVK_ANSI_A, modifiers: .shift)))
-        #expect(UnlockPanel.startsTyping(keyDown("\r", keyCode: kVK_Return)))
-    }
-
-    @Test("Shortcuts, arrows, Tab and Escape don't open the password field")
-    func nonTypingKeys() {
-        #expect(!UnlockPanel.startsTyping(keyDown("v", keyCode: kVK_ANSI_V, modifiers: .command)))
-        #expect(!UnlockPanel.startsTyping(keyDown("a", keyCode: kVK_ANSI_A, modifiers: .control)))
-        #expect(!UnlockPanel.startsTyping(keyDown("\u{F702}", keyCode: kVK_LeftArrow)))
-        #expect(!UnlockPanel.startsTyping(keyDown("\t", keyCode: kVK_Tab)))
-        #expect(!UnlockPanel.startsTyping(keyDown("\u{1B}", keyCode: kVK_Escape)))
     }
 
     @Test("The overlay always catches clicks, even at 0% dim, and darkens by the chosen amount")

@@ -24,7 +24,7 @@ Like a glass case: everything stays visible, but nothing can be touched.
 ## Features
 
 - **Lock in one keystroke.** Press ⇧⌘L, or choose Lock Now from the menu bar. You can change the shortcut.
-- **Unlock with Touch ID or your password.** A small glass pill shows the fingerprint; start typing to use your login password instead.
+- **Unlock with Touch ID or your password.** A small glass pill shows the fingerprint; double-click it to type your login password instead. Typing alone does nothing, and the password field closes again if left unused.
 - **Your agents keep working.** Only your keyboard, mouse and trackpad are blocked. Apps, scripts and AI agents carry on as normal.
 - **Stays awake.** Your Mac and its display don't go to sleep while Clearlock is running.
 - **Nobody gets around it.** App switching, Force Quit and Log Out are disabled while locked, and repeated wrong guesses have to wait. You're told about every failed attempt after you unlock.

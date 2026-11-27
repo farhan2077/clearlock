@@ -5,8 +5,8 @@ import LocalAuthenticationEmbeddedUI
 /// The lock screen's Liquid Glass pill: the Touch ID fingerprint on the left, "Locked by
 /// Clearlock" and a helper line on the right. Touch ID runs inside the pill
 /// (LAAuthenticationView) instead of a system sheet, so it can never be hidden behind the
-/// lock windows. Typing, or clicking the pill, swaps the helper line for the password field;
-/// the pill itself never changes size.
+/// lock windows. Double-clicking the pill (never typing) swaps the helper line for the
+/// password field, which closes again after a while unused; the pill itself never changes size.
 final class UnlockPanel: NSPanel {
     private weak var controller: LockController?
 
@@ -32,6 +32,19 @@ final class UnlockPanel: NSPanel {
     private var throttleTimer: Timer?
     private var throttleUntil = Date.distantPast
     private var feedbackTimer: Timer?
+    private var idleTimer: Timer?
+
+    /// How long the open password field waits for a key press or click before it closes
+    /// and Touch ID shows again (the owner's choice).
+    static let defaultPasswordIdleTimeout: TimeInterval = 15
+    /// The idle wait for this pill. Tests shorten or lengthen it.
+    var passwordIdleTimeout = defaultPasswordIdleTimeout
+
+    /// When the open field will close if nothing happens, or nil while no countdown runs.
+    var idleDeadline: Date? {
+        guard let idleTimer, idleTimer.isValid else { return nil }
+        return idleTimer.fireDate
+    }
 
     /// What the card shows. Tests pass explicit values instead of the user's settings.
     struct Options {
@@ -78,16 +91,20 @@ final class UnlockPanel: NSPanel {
 
     override func sendEvent(_ event: NSEvent) {
         switch event.type {
-        case .keyDown where passwordRow.isHidden && Self.startsTyping(event):
-            // Typing while only Touch ID is showing opens the password field and keeps the keystroke.
-            setPasswordVisible(true)
+        case .keyDown where passwordRow.isHidden:
+            // While only Touch ID is showing, typing does nothing: the password field opens
+            // only on a double-click, so stray key presses can never use up unlock attempts.
+            return
         case .keyDown where event.keyCode == 53 && !passwordRow.isHidden && passwordField.stringValue.isEmpty && touchIDEnabled:
             // Escape on an empty field goes back to Touch ID.
             setPasswordVisible(false)
             return
         case .leftMouseDown where passwordRow.isHidden:
-            // Clicking the pill is the mouse way to type a password.
-            setPasswordVisible(true)
+            // Double-clicking the pill opens the password field; a single click doesn't.
+            if Self.opensPassword(clickCount: event.clickCount) { setPasswordVisible(true) }
+        case .keyDown, .leftMouseDown:
+            // The field is open and in use, so its idle countdown starts over.
+            restartIdleTimer()
         default:
             break
         }
@@ -129,14 +146,18 @@ final class UnlockPanel: NSPanel {
         return NSRect(x: x.rounded(), y: y.rounded(), width: size.width, height: size.height)
     }
 
-    /// The pill's area on screen, for the input shield's clickable region.
+    /// The pill's area on screen, for the input shield's clickable region. Locking reads it
+    /// before the pill is on screen, when nothing is laid out yet; without the layout pass the
+    /// area is empty and the shield blocks every click on the pill.
     var cardScreenFrame: NSRect {
-        convertToScreen(card.convert(card.bounds, to: nil))
+        contentView?.layoutSubtreeIfNeeded()
+        return convertToScreen(card.convert(card.bounds, to: nil))
     }
 
     /// Where the fingerprint is on screen.
     var touchIDScreenFrame: NSRect {
-        convertToScreen(touchIDContainer.convert(touchIDContainer.bounds, to: nil))
+        contentView?.layoutSubtreeIfNeeded()
+        return convertToScreen(touchIDContainer.convert(touchIDContainer.bounds, to: nil))
     }
 
     /// Where the title, helper line and password row are on screen, at their natural
@@ -161,10 +182,16 @@ final class UnlockPanel: NSPanel {
         authContext = nil
         throttleTimer?.invalidate()
         feedbackTimer?.invalidate()
+        idleTimer?.invalidate()
+        idleTimer = nil
     }
 
-    /// The same as clicking the pill.
+    /// The same as double-clicking the pill.
     func revealPassword() { setPasswordVisible(true) }
+
+    /// A double-click opens the password field. A single click, like a stray tap on the
+    /// trackpad, doesn't.
+    static func opensPassword(clickCount: Int) -> Bool { clickCount >= 2 }
 
     #if DEBUG
     func debugShowPassword() { revealPassword() }
@@ -176,18 +203,45 @@ final class UnlockPanel: NSPanel {
         helperLabel.isHidden = visible
         if visible {
             focusPasswordField()
+            restartIdleTimer()
         } else {
+            idleTimer?.invalidate()
+            idleTimer = nil
             passwordField.stringValue = ""
             makeFirstResponder(nil)
         }
     }
 
-    /// Whether a key press means someone started typing a password (so the field appears).
-    static func startsTyping(_ event: NSEvent) -> Bool {
-        if event.modifierFlags.contains(.command) || event.modifierFlags.contains(.control) { return false }
-        if event.keyCode == 36 || event.keyCode == 76 { return true } // Return, Enter
-        guard let characters = event.characters, let scalar = characters.unicodeScalars.first else { return false }
-        return !CharacterSet.controlCharacters.contains(scalar) && scalar.value < 0xF700 // excludes arrows and F-keys
+    /// Starts (or restarts) the open field's idle countdown. Only with Touch ID: without it,
+    /// or after a lockout, the field is the only way in and stays open.
+    private func restartIdleTimer() {
+        idleTimer?.invalidate()
+        idleTimer = nil
+        guard touchIDEnabled, !passwordRow.isHidden else { return }
+        let timer = Timer(timeInterval: passwordIdleTimeout, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.passwordFieldWentIdle() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        idleTimer = timer
+    }
+
+    /// Nothing was typed or clicked for a while: the field closes, clearing anything half
+    /// typed, and Touch ID shows again. Not while a password is being checked or a wait after
+    /// wrong attempts is running; it tries again later.
+    private func passwordFieldWentIdle() {
+        guard !passwordRow.isHidden else { return }
+        if Self.closesWhenIdle(touchIDEnabled: touchIDEnabled, isVerifying: isVerifying,
+                               isWaiting: throttleUntil > Date()) {
+            setPasswordVisible(false)
+        } else {
+            restartIdleTimer() // does nothing without Touch ID, where the field stays open
+        }
+    }
+
+    /// Whether an idle password field closes now. Never while a password is being checked or
+    /// a wait after wrong attempts runs, and never without Touch ID, since it's the only way in.
+    static func closesWhenIdle(touchIDEnabled: Bool, isVerifying: Bool, isWaiting: Bool) -> Bool {
+        touchIDEnabled && !isVerifying && !isWaiting
     }
 
     /// How many characters are in the password field (never the characters themselves).
@@ -261,23 +315,33 @@ final class UnlockPanel: NSPanel {
         Task { @MainActor in
             let result = await controller.submitPassword(password)
             isVerifying = false
-            switch result {
-            case .success:
-                return
-            case .failure:
-                passwordField.isEnabled = true
-                submitButton.isEnabled = true
-                passwordField.stringValue = ""
-                showFeedback("Incorrect password")
-                shake()
-                focusPasswordField()
-            case .throttled(let until):
-                passwordField.stringValue = ""
-                shake()
-                startThrottleCountdown(until: until)
-            }
+            handlePasswordResult(result)
         }
     }
+
+    /// What the pill does with a checked password. Internal so tests can feed it results
+    /// without checking a real password.
+    func handlePasswordResult(_ result: LockController.PasswordResult) {
+        switch result {
+        case .success:
+            return
+        case .failure:
+            passwordField.isEnabled = true
+            submitButton.isEnabled = true
+            passwordField.stringValue = ""
+            showFeedback("Incorrect password")
+            shake()
+            focusPasswordField()
+            restartIdleTimer()
+        case .throttled(let until):
+            passwordField.stringValue = ""
+            shake()
+            startThrottleCountdown(until: until)
+        }
+    }
+
+    /// True while a wait after wrong attempts keeps the password field disabled.
+    var isWaitingAfterWrongAttempts: Bool { throttleTimer?.isValid ?? false }
 
     private func startThrottleCountdown(until: Date) {
         throttleTimer?.invalidate()
@@ -301,6 +365,7 @@ final class UnlockPanel: NSPanel {
         submitButton.isEnabled = true
         hideFeedback()
         focusPasswordField()
+        restartIdleTimer()
     }
 
     /// Feedback (wrong password, wait time) briefly takes the title's place, in red.
@@ -369,7 +434,7 @@ final class UnlockPanel: NSPanel {
         titleLabel.font = .systemFont(ofSize: 15, weight: .semibold)
         titleLabel.textColor = .labelColor
 
-        helperLabel.stringValue = touchIDEnabled ? "Touch ID or start typing your password" : "Type your password to unlock"
+        helperLabel.stringValue = touchIDEnabled ? "Touch ID, or double-click for password" : "Type your password to unlock"
         helperLabel.font = .systemFont(ofSize: 12)
         helperLabel.textColor = .secondaryLabelColor
 

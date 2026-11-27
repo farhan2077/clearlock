@@ -20,6 +20,29 @@ struct UnlockCardTests {
         card.orderOut(nil)
     }
 
+    @Test("A physical click anywhere on the pill gets through the shield, measured the way locking does it: before the pill is shown")
+    func shieldLetsClicksOnThePillThrough() throws {
+        // Locking places the pill and hands its area to the shield before the pill is on screen.
+        let card = UnlockPanel(controller: LockController.shared, options: .init(touchIDAvailable: true))
+        defer { close(card) }
+        let screen = NSScreen.main ?? NSScreen.screens[0]
+        card.present(on: screen)
+        let primary = try #require(NSScreen.screens.first)
+        let pill = card.cardScreenFrame
+        #expect(pill.size == UnlockPanel.pillSize)
+
+        let rect = LockController.eventRect(fromScreenFrame: pill, primaryScreenMaxY: primary.frame.maxY)
+        let context = InputShield.Context(promptFocused: true, interactiveRects: [rect])
+        let windowFrame = card.frame
+        // The text, the fingerprint and the empty glass at the right end, in event-tap coordinates.
+        for fraction in [0.65, 0.1, 0.92] {
+            let point = CGPoint(x: windowFrame.minX + windowFrame.width * fraction,
+                                y: primary.frame.maxY - windowFrame.midY)
+            #expect(InputShield.decide(type: .leftMouseDown, isAutomation: false, flags: [], keyCode: 0,
+                                       location: point, context: context) == .pass)
+        }
+    }
+
     @Test("With Touch ID, the card starts with Touch ID only and no password field")
     func touchIDFirst() {
         let card = makeCard(touchID: true)
@@ -99,24 +122,37 @@ struct UnlockCardTests {
         #expect(card.touchIDScreenFrame == fingerprint)
     }
 
-    @Test("Clicking the pill opens the password field")
-    func clickOpensPassword() {
+    @Test("A single click on the pill leaves Touch ID showing; a double-click opens the password field")
+    func doubleClickOpensPassword() {
         let card = makeCard()
         defer { close(card) }
         let point = NSPoint(x: UnlockPanel.pillSize.width * 0.65, y: UnlockPanel.pillSize.height / 2)
-        func mouse(_ type: NSEvent.EventType) -> NSEvent {
+        func mouse(_ type: NSEvent.EventType, clickCount: Int) -> NSEvent {
             NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: 0,
-                               windowNumber: card.windowNumber, context: nil, eventNumber: 0, clickCount: 1,
+                               windowNumber: card.windowNumber, context: nil, eventNumber: 0, clickCount: clickCount,
                                pressure: type == .leftMouseDown ? 1 : 0)!
         }
-        // A whole click: the press opens the password field under the pointer, and the field
-        // then tracks the mouse until the button is released. Without the release queued, that
+        // A whole click: a press that opens the password field lands in it, and the field then
+        // tracks the mouse until the button is released. Without the release queued, that
         // tracking waits forever (it hung the test on GitHub's runner).
-        NSApp.postEvent(mouse(.leftMouseUp), atStart: false)
-        card.sendEvent(mouse(.leftMouseDown))
-        // Drop the release if nothing tracked it, so it can't reach a later test.
-        _ = NSApp.nextEvent(matching: .leftMouseUp, until: .distantPast, inMode: .default, dequeue: true)
+        func click(_ clickCount: Int) {
+            NSApp.postEvent(mouse(.leftMouseUp, clickCount: clickCount), atStart: false)
+            card.sendEvent(mouse(.leftMouseDown, clickCount: clickCount))
+            // Drop the release if nothing tracked it, so it can't reach a later test.
+            _ = NSApp.nextEvent(matching: .leftMouseUp, until: .distantPast, inMode: .default, dequeue: true)
+        }
+
+        click(1)
+        #expect(!card.isPasswordVisible)
+        click(2)
         #expect(card.isPasswordVisible)
+    }
+
+    @Test("Only a double-click (or more) counts as asking for the password field")
+    func clickCounts() {
+        #expect(!UnlockPanel.opensPassword(clickCount: 1))
+        #expect(UnlockPanel.opensPassword(clickCount: 2))
+        #expect(UnlockPanel.opensPassword(clickCount: 3))
     }
 
     @Test("The card is always fully shown, with its shadow, and has no hidden state")

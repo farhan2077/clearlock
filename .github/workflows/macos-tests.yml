@@ -1,22 +1,22 @@
-# Runs the unit tests on every push that changes the app, its tests or how they're built.
-# Pushes that only touch docs or repo housekeeping (README.md, CLAUDE.md, .gitignore, the
-# release and signing scripts, …) don't affect the app, so they don't run anything.
-name: Tests
+# Runs the Mac app's unit tests on every push that changes the app, its tests or how they're built.
+# Pushes that only touch docs, repo housekeeping (README.md, CLAUDE.md, .gitignore, the
+# release and signing scripts, …), the Windows app or the website don't affect it, so they don't run it.
+name: macOS tests
 
 on:
   push:
     paths:
-      - "Clearlock/**"
-      - "ClearlockTests/**"
-      - "Clearlock.xcodeproj/**"
-      - "Config/**"
-      - "scripts/test.sh"
-      - ".github/workflows/tests.yml"
+      - "macos/Clearlock/**"
+      - "macos/ClearlockTests/**"
+      - "macos/Clearlock.xcodeproj/**"
+      - "macos/Config/**"
+      - "macos/scripts/test.sh"
+      - ".github/workflows/macos-tests.yml"
   workflow_dispatch:
 
 # A newer push to the same branch replaces a run that's still going.
 concurrency:
-  group: tests-${{ github.ref }}
+  group: macos-tests-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -37,7 +37,7 @@ jobs:
       # Tests build with the project's ad-hoc signing; the self-signed release certificate
       # is never needed (or present) here.
       - name: Run tests
-        run: scripts/test.sh
+        run: macos/scripts/test.sh
         env:
           # test.sh writes its log here and keeps it only when the run fails.
           CLEARLOCK_TEST_LOG: ${{ runner.temp }}/clearlock-tests.log

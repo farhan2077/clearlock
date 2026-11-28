@@ -5,8 +5,9 @@
 # re-grant permissions and cannot auto-update to builds signed by a new cert.
 set -euo pipefail
 
-ROOT=${0:A:h:h}
-DIR="$ROOT/.signing"
+ROOT=${0:A:h:h}             # macos/
+TOP=${ROOT:h}                # the repo; .signing/ lives here, shared by every platform
+DIR="$TOP/.signing"
 NAME="ClearLock Self-Signed"
 KEYCHAIN="$DIR/clearlock-signing.keychain-db"
 KC_PASS="clearlock"   # protects only this local keychain; the key never leaves it

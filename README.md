@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Clearlock/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png" width="128" height="128" alt="Clearlock icon">
+  <img src="macos/Clearlock/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png" width="128" height="128" alt="Clearlock icon">
 </p>
 
 <h1 align="center">Clearlock</h1>
@@ -54,8 +54,8 @@ To forget your settings too, delete `~/.config/clearlock`.
 ## Building from source
 
 ```bash
-scripts/build.sh --run    # build and launch
-scripts/test.sh           # run the tests
+macos/scripts/build.sh --run    # build and launch
+macos/scripts/test.sh           # run the tests
 ```
 
 Project rules and technical details are in [CLAUDE.md](CLAUDE.md).

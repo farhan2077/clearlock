@@ -1,6 +1,6 @@
 #!/usr/bin/env swift
 // Renders the app icon into Clearlock/Resources/Assets.xcassets/AppIcon.appiconset.
-// Usage: swift scripts/make-icon.swift
+// Usage: swift macos/scripts/make-icon.swift
 import AppKit
 
 let root = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent().deletingLastPathComponent()

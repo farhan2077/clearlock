@@ -1,10 +1,10 @@
 #!/bin/zsh
 # Development helper for Debug builds (Clearlock Dev): lock, unlock or open windows from Terminal
 # (or over SSH), so a lock can always be released while testing.
-#   scripts/debug-lock.sh lock|unlock|settings|diagnostics|onboarding
-#   scripts/debug-lock.sh snapshot <folder>   Save PNGs of all visible windows
-#   scripts/debug-lock.sh status <file>       Write lock/focus state to a file
-#   scripts/debug-lock.sh cardtest <file>     Build an invisible pill, open the password field and
+#   macos/scripts/debug-lock.sh lock|unlock|settings|diagnostics|onboarding
+#   macos/scripts/debug-lock.sh snapshot <folder>   Save PNGs of all visible windows
+#   macos/scripts/debug-lock.sh status <file>       Write lock/focus state to a file
+#   macos/scripts/debug-lock.sh cardtest <file>     Build an invisible pill, open the password field and
 #                                             record whether the pill or fingerprint moved (no lock)
 set -euo pipefail
 # Only Clearlock Dev has these hooks; its notification names start with its bundle ID.

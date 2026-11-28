@@ -2,20 +2,22 @@
 # Packages a Clearlock release: a .dmg for people to download and a .zip for the in-app updater.
 # Versions follow semver, MAJOR.MINOR.PATCH, starting at 1.0.0.
 #
-#   scripts/release.sh 1.0.0             Dry run: checks the version, runs the tests, builds and
+#   macos/scripts/release.sh 1.0.0             Dry run: checks the version, runs the tests, builds and
 #                                        packages into build/release/. Changes no files, publishes nothing.
-#   scripts/release.sh 1.0.0 --publish   Also sets the version in the project, commits it, tags
+#   macos/scripts/release.sh 1.0.0 --publish   Also sets the version in the project, commits it, tags
 #                                        v1.0.0, pushes, and creates the GitHub release with both files.
-#                                        The README's app size badge is kept by hand; this never edits it.
+#                                        The README's app size badge (the download size) is kept by hand;
+#                                        this never edits it.
 #
 # Only publish when the owner has asked for that exact version (see CLAUDE.md).
 set -euo pipefail
 
-ROOT=${0:A:h:h}
+ROOT=${0:A:h:h}             # macos/
+TOP=${ROOT:h}                # the repo; .signing/ lives here, shared by every platform
 REPO=farhan2077/clearlock
 PBX="$ROOT/Clearlock.xcodeproj/project.pbxproj"
 OUT="$ROOT/build/release"
-KEYCHAIN="$ROOT/.signing/clearlock-signing.keychain-db"
+KEYCHAIN="$TOP/.signing/clearlock-signing.keychain-db"
 IDENTITY="ClearLock Self-Signed"
 
 die() { print -u2 "release: $*"; exit 1 }
@@ -97,19 +99,18 @@ security unlock-keychain -p clearlock "$KEYCHAIN"
 codesign --force --timestamp=none --keychain "$KEYCHAIN" -s "$IDENTITY" --identifier com.farhan2077.clearlock.dmg "$DMG"
 hdiutil verify -quiet "$DMG"
 
-# The installed app's size, in decimal megabytes like Finder shows. Shown only; the README badge
-# is the owner's to set by hand.
-APP_BYTES=$(unzip -l "$ZIP" | tail -1 | awk '{print $1}')
-APP_SIZE=$(awk -v b="$APP_BYTES" 'BEGIN { printf "%.1f", b / 1000000 }')
+# The download's size (the .dmg people download), in decimal megabytes like Finder and GitHub
+# show. It's what the README's "app size" badge shows; the owner sets the badge by hand.
+DOWNLOAD_SIZE=$(awk -v b="$(stat -f%z "$DMG")" 'BEGIN { printf "%.1f", b / 1000000 }')
 
 print "Packaged:"
 for f in "$DMG" "$ZIP"; do print "  ${f#$ROOT/}  $(du -h "$f" | cut -f1)  sha256 $(shasum -a 256 "$f" | cut -c1-16)…"; done
 
-print "  app size $APP_SIZE MB installed"
+print "  download size $DOWNLOAD_SIZE MB (the README's app size badge)"
 
 if (( ! PUBLISH )); then
   print "Dry run: nothing was committed, tagged or published."
-  print "To publish: scripts/release.sh $VERSION --publish"
+  print "To publish: macos/scripts/release.sh $VERSION --publish"
   exit 0
 fi
 

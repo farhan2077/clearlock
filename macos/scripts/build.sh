@@ -1,13 +1,14 @@
 #!/bin/zsh
 # Builds Clearlock and signs it with the stable self-signed identity.
-#   scripts/build.sh            Release build → build/Clearlock.app (com.farhan2077.clearlock)
-#   scripts/build.sh debug      Debug build → build/Clearlock Dev.app (com.farhan2077.clearlock.dev),
+#   macos/scripts/build.sh            Release build → build/Clearlock.app (com.farhan2077.clearlock)
+#   macos/scripts/build.sh debug      Debug build → build/Clearlock Dev.app (com.farhan2077.clearlock.dev),
 #                               a separate app with its own settings and permissions, plus Terminal test hooks
-#   scripts/build.sh --run      Build, quit the running copy of that same app, and launch the new one
+#   macos/scripts/build.sh --run      Build, quit the running copy of that same app, and launch the new one
 # Clearlock and Clearlock Dev run side by side; --run never quits the other one.
 set -euo pipefail
 
-ROOT=${0:A:h:h}
+ROOT=${0:A:h:h}             # macos/
+TOP=${ROOT:h}                # the repo; .signing/ lives here, shared by every platform
 CONFIG=Release
 NAME=Clearlock
 BUNDLE_ID=com.farhan2077.clearlock
@@ -19,12 +20,12 @@ for arg in "$@"; do
   esac
 done
 
-KEYCHAIN="$ROOT/.signing/clearlock-signing.keychain-db"
+KEYCHAIN="$TOP/.signing/clearlock-signing.keychain-db"
 IDENTITY="ClearLock Self-Signed"
 [[ -f "$KEYCHAIN" ]] || "$ROOT/scripts/setup-signing.sh"
 
-# scripts/release.sh can stamp a version without editing the project:
-# CLEARLOCK_VERSION=1.0.0 CLEARLOCK_BUILD=2 scripts/build.sh
+# macos/scripts/release.sh can stamp a version without editing the project:
+# CLEARLOCK_VERSION=1.0.0 CLEARLOCK_BUILD=2 macos/scripts/build.sh
 OVERRIDES=()
 [[ -n ${CLEARLOCK_VERSION:-} ]] && OVERRIDES+=("MARKETING_VERSION=$CLEARLOCK_VERSION")
 [[ -n ${CLEARLOCK_BUILD:-} ]] && OVERRIDES+=("CURRENT_PROJECT_VERSION=$CLEARLOCK_BUILD")

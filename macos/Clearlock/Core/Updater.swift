@@ -101,8 +101,8 @@ final class Updater {
             request.setValue("Clearlock/\(currentVersion)", forHTTPHeaderField: "User-Agent")
             request.timeoutInterval = 20
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-                throw UpdateError("No releases found for \(repository).")
+            if let failure = Self.checkFailure(response as? HTTPURLResponse) {
+                throw UpdateError(failure.message(repository: repository))
             }
             let check = try Self.evaluate(data, currentVersion: currentVersion)
             Preferences.shared.lastUpdateCheck = Date()
@@ -147,6 +147,49 @@ final class Updater {
     enum ReleaseCheck: Equatable {
         case upToDate
         case available(Release)
+    }
+
+    /// Why GitHub didn't answer a check with a release.
+    enum CheckFailure: Equatable {
+        /// GitHub allows 60 unauthenticated checks an hour per internet address, which a shared
+        /// address can use up. `resetsAt` is when it allows them again, if GitHub said.
+        case rateLimited(resetsAt: Date?)
+        /// The repository has no published release (or doesn't exist).
+        case noReleases
+        /// Any other refusal or server error.
+        case unexpected(statusCode: Int)
+
+        func message(repository: String) -> String {
+            switch self {
+            case .rateLimited(let resetsAt?) where resetsAt > Date():
+                "GitHub is limiting update checks from this network. Try again after \(resetsAt.formatted(date: .omitted, time: .shortened))."
+            case .rateLimited:
+                "GitHub is limiting update checks from this network. Try again later."
+            case .noReleases:
+                "No releases found for \(repository)."
+            case .unexpected(let code):
+                "GitHub couldn’t answer the update check (error \(code)). Try again later."
+            }
+        }
+    }
+
+    /// Reads a "latest release" response's status: nil when it carries a release.
+    /// GitHub reports its rate limit as 403 or 429, with no checks remaining or a Retry-After.
+    static func checkFailure(_ response: HTTPURLResponse?) -> CheckFailure? {
+        guard let response else { return .unexpected(statusCode: 0) }
+        let code = response.statusCode
+        if code == 200 { return nil }
+        if code == 404 { return .noReleases }
+        if code == 403 || code == 429 {
+            let remaining = response.value(forHTTPHeaderField: "x-ratelimit-remaining")
+            let retryAfter = response.value(forHTTPHeaderField: "retry-after").flatMap(TimeInterval.init)
+            if code == 429 || remaining == "0" || retryAfter != nil {
+                let reset = response.value(forHTTPHeaderField: "x-ratelimit-reset")
+                    .flatMap(TimeInterval.init).map(Date.init(timeIntervalSince1970:))
+                return .rateLimited(resetsAt: retryAfter.map { Date().addingTimeInterval($0) } ?? reset)
+            }
+        }
+        return .unexpected(statusCode: code)
     }
 
     /// Reads GitHub's "latest release" response: a newer version (tag "v1.2.0" or "1.2.0")

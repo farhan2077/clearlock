@@ -65,6 +65,37 @@ struct UpdaterTests {
         #expect(throws: Updater.UpdateError.self) { try Updater.shared.verify(app, expectedVersion: "9.9.9") }
     }
 
+    private func response(_ code: Int, _ headers: [String: String] = [:]) -> HTTPURLResponse {
+        HTTPURLResponse(url: URL(string: "https://api.github.com/repos/o/r/releases/latest")!,
+                        statusCode: code, httpVersion: nil, headerFields: headers)!
+    }
+
+    @Test("A check that GitHub answers with a release isn't a failure")
+    func successIsNotAFailure() {
+        #expect(Updater.checkFailure(response(200)) == nil)
+    }
+
+    @Test("GitHub's rate limit is reported as a limit, with its reset time, not as missing releases")
+    func rateLimitIsRecognized() {
+        let limited = Updater.checkFailure(response(403, ["X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "1795891092"]))
+        #expect(limited == .rateLimited(resetsAt: Date(timeIntervalSince1970: 1795891092)))
+        #expect(Updater.checkFailure(response(429)) == .rateLimited(resetsAt: nil))
+
+        guard case .rateLimited(let resetsAt?) = Updater.checkFailure(response(403, ["Retry-After": "60"])) else {
+            Issue.record("Retry-After wasn't read as a rate limit")
+            return
+        }
+        #expect(abs(resetsAt.timeIntervalSinceNow - 60) < 30)
+    }
+
+    @Test("Only a 404 means there are no releases; other refusals are reported as errors")
+    func otherFailuresAreDistinct() {
+        #expect(Updater.checkFailure(response(404)) == .noReleases)
+        #expect(Updater.checkFailure(response(403, ["X-RateLimit-Remaining": "12"])) == .unexpected(statusCode: 403))
+        #expect(Updater.checkFailure(response(500)) == .unexpected(statusCode: 500))
+        #expect(Updater.checkFailure(nil) == .unexpected(statusCode: 0))
+    }
+
     /// A minimal, unsigned app bundle in a temporary folder.
     private func makeBundle(identifier: String) throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("ClearlockTests-\(UUID().uuidString)")

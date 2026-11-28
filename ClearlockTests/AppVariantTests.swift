@@ -32,7 +32,7 @@ struct AppVariantTests {
         #expect(LidSleepManager.rulePath == AppVariant.current.lidHelperPath)
     }
 
-    @Test("Nothing is shared: settings backup, lid helper, shortcut, name and debug hooks all differ")
+    @Test("Nothing is shared: settings backup, lid helper, name and debug hooks all differ")
     func nothingShared() {
         let release = AppVariant.release, dev = AppVariant.dev
         #expect(release.displayName != dev.displayName)
@@ -40,29 +40,24 @@ struct AppVariantTests {
         #expect((release.settingsBackupPath as NSString).deletingLastPathComponent
             != (dev.settingsBackupPath as NSString).deletingLastPathComponent)
         #expect(release.lidHelperPath != dev.lidHelperPath)
-        #expect(release.defaultLockShortcut != dev.defaultLockShortcut)
         #expect(!release.debugNotificationPrefix.hasPrefix(dev.debugNotificationPrefix))
         #expect(dev.debugNotificationPrefix.hasPrefix(dev.bundleID + "."))
     }
 
-    @Test("The release's paths and shortcut are unchanged")
+    @Test("The release's paths are unchanged")
     func releaseUnchanged() {
         #expect(AppVariant.release.settingsBackupPath == ".config/clearlock/settings.plist")
         #expect(AppVariant.release.lidHelperPath == "/etc/sudoers.d/clearlock")
-        #expect(AppVariant.release.defaultLockShortcut == .defaultLock)
         #expect(AppVariant.release.debugNotificationPrefix == "com.farhan2077.clearlock.debug.")
     }
 
-    @Test("A fresh install of each copy gets its own default lock shortcut")
-    func defaultShortcutPerCopy() {
+    @Test("Clearlock and Clearlock Dev both lock with ⇧⌘L by default")
+    func sameDefaultShortcut() {
+        // The test host is Clearlock Dev, so a fresh install here is a fresh Dev install.
+        #expect(AppVariant.current == .dev)
         let suite = IsolatedDefaults()
-        #expect(Preferences(store: suite.defaults, variant: .release).lockShortcut == .defaultLock)
-        let other = IsolatedDefaults()
-        let devShortcut = Preferences(store: other.defaults, variant: .dev).lockShortcut
-        #expect(devShortcut == AppVariant.dev.defaultLockShortcut)
-        #expect(devShortcut != .defaultLock)
-        // Still a valid global shortcut: at least one modifier besides Shift.
-        #expect(devShortcut?.modifierFlags.intersection([.control, .option, .command]).isEmpty == false)
+        #expect(Preferences(store: suite.defaults).lockShortcut == .defaultLock)
+        #expect(Shortcut.defaultLock.modifierFlags == [.command, .shift])
     }
 
     @Test("Clearlock Dev never checks for or installs releases")

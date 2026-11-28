@@ -7,10 +7,11 @@ struct PreferencesTests {
     @Test("A fresh install uses the agreed defaults")
     func freshInstallDefaults() {
         let suite = IsolatedDefaults()
-        let prefs = Preferences(store: suite.defaults, variant: .release)
+        let prefs = Preferences(store: suite.defaults)
 
         #expect(prefs.lockShortcut == .defaultLock)
         #expect(prefs.cardPosition == .center)
+        #expect(prefs.pillSize == .regular)
         #expect(prefs.dimLevel == 0.3)
         #expect(!prefs.keepAwakeWithLidClosed)
         #expect(prefs.lidOnlyOnPower)
@@ -26,6 +27,7 @@ struct PreferencesTests {
         let custom = Shortcut(keyCode: 40, modifiers: [.control, .option], key: "K")
         first.lockShortcut = custom
         first.cardPosition = .bottomRight
+        first.pillSize = .tiny
         first.dimLevel = 0.2
         first.tint = .purple
         first.keepAwakeWithLidClosed = true
@@ -36,6 +38,7 @@ struct PreferencesTests {
         let relaunched = Preferences(store: suite.defaults)
         #expect(relaunched.lockShortcut == custom)
         #expect(relaunched.cardPosition == .bottomRight)
+        #expect(relaunched.pillSize == .tiny)
         #expect(relaunched.dimLevel == 0.2)
         #expect(relaunched.tint == .purple)
         #expect(relaunched.keepAwakeWithLidClosed)
@@ -49,6 +52,37 @@ struct PreferencesTests {
         let suite = IsolatedDefaults()
         suite.defaults.set("upsideDown", forKey: "cardPosition")
         #expect(Preferences(store: suite.defaults).cardPosition == .center)
+    }
+
+    @Test("Every pill size survives a relaunch, and an unknown saved size falls back to Regular",
+          arguments: PillSize.allCases)
+    func pillSizePersists(size: PillSize) {
+        let suite = IsolatedDefaults()
+        Preferences(store: suite.defaults).pillSize = size
+        #expect(Preferences(store: suite.defaults).pillSize == size)
+        suite.defaults.set("enormous", forKey: "pillSize")
+        #expect(Preferences(store: suite.defaults).pillSize == .regular)
+    }
+
+    @Test("A size picked on Clearlock Dev's temporary picker carries over once, then the old key is gone")
+    func legacyPillSizeCarriesOver() {
+        let picks: [String: PillSize] = ["slight": .regular, "between": .small, "tiny": .small, "oneLine": .tiny]
+        for (old, size) in picks {
+            #expect(PillSize.fromLegacy(old) == size)
+            let suite = IsolatedDefaults()
+            suite.defaults.set(old, forKey: PillSize.legacyDefaultsKey)
+            #expect(Preferences(store: suite.defaults).pillSize == size)
+            #expect(suite.defaults.object(forKey: PillSize.legacyDefaultsKey) == nil)
+            #expect(Preferences(store: suite.defaults).pillSize == size)
+        }
+        #expect(PillSize.fromLegacy(nil) == nil && PillSize.fromLegacy("nano") == nil)
+
+        // A size already picked in Settings wins over the old pick.
+        let suite = IsolatedDefaults()
+        suite.defaults.set("small", forKey: "pillSize")
+        suite.defaults.set("oneLine", forKey: PillSize.legacyDefaultsKey)
+        #expect(Preferences(store: suite.defaults).pillSize == .small)
+        #expect(suite.defaults.object(forKey: PillSize.legacyDefaultsKey) == nil)
     }
 
     @Test("A cleared lock shortcut stays cleared instead of reverting to the default")

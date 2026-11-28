@@ -28,7 +28,7 @@ Like a glass case: everything stays visible, but nothing can be touched.
 - **Your agents keep working.** Only your keyboard, mouse and trackpad are blocked. Apps, scripts and AI agents carry on as normal.
 - **Stays awake.** Your Mac and its display don't go to sleep while Clearlock is running.
 - **Nobody gets around it.** App switching, Force Quit and Log Out are disabled while locked, and repeated wrong guesses have to wait. You're told about every failed attempt after you unlock.
-- **Make it yours.** Choose where the unlock pill sits, how much the screen dims, and the color of the menu bar lock.
+- **Make it yours.** Choose where the unlock pill sits and how big it is, how much the screen dims, and the color of the menu bar lock.
 - **Keeps running with the lid closed** (optional), only when plugged in if you like.
 - **Light on your Mac.** No CPU use while idle. A built-in Diagnostics window shows exactly what it costs.
 - **Updates itself** from GitHub Releases.

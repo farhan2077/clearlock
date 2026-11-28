@@ -72,7 +72,7 @@ struct SettingsView: View {
                     }
                 }
                 LabeledContent("Lock shortcut") {
-                    ShortcutRecorder(shortcut: $prefs.lockShortcut, defaultShortcut: AppVariant.current.defaultLockShortcut,
+                    ShortcutRecorder(shortcut: $prefs.lockShortcut, defaultShortcut: .defaultLock,
                                      conflict: hotKeys.failures.contains(.lock))
                 }
                 LabeledContent("Lock color") {
@@ -87,6 +87,9 @@ struct SettingsView: View {
                 } label: {
                     Text("Position")
                     Text(prefs.cardPosition.title)
+                }
+                Picker("Pill size", selection: $prefs.pillSize) {
+                    ForEach(PillSize.allCases) { Text($0.title).tag($0) }
                 }
                 LabeledContent {
                     HStack {

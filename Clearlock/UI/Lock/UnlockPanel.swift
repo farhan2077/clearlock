@@ -10,7 +10,10 @@ import LocalAuthenticationEmbeddedUI
 final class UnlockPanel: NSPanel {
     private weak var controller: LockController?
 
-    static let pillSize = NSSize(width: 360, height: 72)
+    /// The default pill size (Regular). A pill's own size is `metrics.size`.
+    static let pillSize = PillSize.defaultSize.metrics.size
+
+    private var metrics: PillSize.Metrics { options.size.metrics }
 
     private static let isUnitTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
@@ -51,9 +54,15 @@ final class UnlockPanel: NSPanel {
         /// Touch ID is always used when the Mac has it; there's no setting to turn it off.
         var touchIDAvailable: Bool
         var position: CardPosition = .center
+        var size: PillSize = .defaultSize
 
+        /// What a lock shows: the user's settings. `from(_:touchIDAvailable:)` is the same, for tests.
         static var current: Options {
-            Options(touchIDAvailable: Authenticator.isTouchIDAvailable, position: Preferences.shared.cardPosition)
+            from(.shared, touchIDAvailable: Authenticator.isTouchIDAvailable)
+        }
+
+        static func from(_ prefs: Preferences, touchIDAvailable: Bool) -> Options {
+            Options(touchIDAvailable: touchIDAvailable, position: prefs.cardPosition, size: prefs.pillSize)
         }
     }
 
@@ -72,7 +81,7 @@ final class UnlockPanel: NSPanel {
     init(controller: LockController, options: Options = .current) {
         self.controller = controller
         self.options = options
-        super.init(contentRect: NSRect(origin: .zero, size: Self.pillSize),
+        super.init(contentRect: NSRect(origin: .zero, size: options.size.metrics.size),
                    styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
         isOpaque = false
@@ -122,7 +131,7 @@ final class UnlockPanel: NSPanel {
     func present(on screen: NSScreen) {
         // Top positions stay clear of the menu bar and the camera housing.
         let topInset = max(screen.frame.maxY - screen.visibleFrame.maxY, screen.safeAreaInsets.top)
-        setFrame(Self.frame(for: options.position, in: screen.frame, topInset: topInset), display: true)
+        setFrame(Self.frame(for: options.position, in: screen.frame, topInset: topInset, size: metrics.size), display: true)
         controller?.unlockPanelDidChangeFrame()
     }
 
@@ -164,11 +173,14 @@ final class UnlockPanel: NSPanel {
     /// (unclipped) widths, so tests can check they fit inside the pill.
     var textScreenFrames: [NSRect] {
         card.layoutSubtreeIfNeeded()
-        return [titleLabel, helperLabel, passwordRow].map { view in
-            let frame = view.convert(view.bounds, to: nil)
-            let natural = NSRect(origin: frame.origin,
-                                 size: NSSize(width: max(frame.width, view.fittingSize.width), height: frame.height))
-            return convertToScreen(natural)
+        let views: [NSView] = metrics.oneLine ? [titleLabel, passwordRow] : [titleLabel, helperLabel, passwordRow]
+        // Alignment rects: a text label's frame has a couple of points of padding around the text.
+        return views.map { view in
+            let aligned = view.alignmentRect(forFrame: view.frame)
+            let intrinsic = view.intrinsicContentSize.width
+            let width = max(aligned.width, intrinsic > 0 ? intrinsic : view.fittingSize.width)
+            let rect = NSRect(origin: aligned.origin, size: NSSize(width: width, height: aligned.height))
+            return convertToScreen(view.superview?.convert(rect, to: nil) ?? rect)
         }
     }
 
@@ -200,7 +212,8 @@ final class UnlockPanel: NSPanel {
     /// Swaps the helper line for the password field (or back). The pill doesn't change size.
     private func setPasswordVisible(_ visible: Bool) {
         passwordRow.isHidden = !visible
-        helperLabel.isHidden = visible
+        // The field takes the helper line's place, or the title's in a one-line pill.
+        (metrics.oneLine ? titleLabel : helperLabel).isHidden = visible
         if visible {
             focusPasswordField()
             restartIdleTimer()
@@ -208,8 +221,10 @@ final class UnlockPanel: NSPanel {
             idleTimer?.invalidate()
             idleTimer = nil
             passwordField.stringValue = ""
+            if metrics.oneLine, isFeedbackInField { hideFeedback() }
             makeFirstResponder(nil)
         }
+        refreshTitle()
     }
 
     /// Starts (or restarts) the open field's idle countdown. Only with Touch ID: without it,
@@ -255,15 +270,15 @@ final class UnlockPanel: NSPanel {
         guard touchIDEnabled, !isEvaluating, !Self.isUnitTesting else { return }
         let context = LAContext()
         context.localizedFallbackTitle = ""
-        let view = LAAuthenticationView(context: context, controlSize: .large)
+        let view = LAAuthenticationView(context: context, controlSize: metrics.authControlSize)
         authView?.removeFromSuperview()
         view.translatesAutoresizingMaskIntoConstraints = false
         touchIDContainer.addSubview(view)
         NSLayoutConstraint.activate([
             view.centerXAnchor.constraint(equalTo: touchIDContainer.centerXAnchor),
             view.centerYAnchor.constraint(equalTo: touchIDContainer.centerYAnchor),
-            view.widthAnchor.constraint(equalToConstant: 38),
-            view.heightAnchor.constraint(equalToConstant: 38),
+            view.widthAnchor.constraint(equalToConstant: metrics.fingerprint),
+            view.heightAnchor.constraint(equalToConstant: metrics.fingerprint),
         ])
         authView = view
         authContext = context
@@ -288,7 +303,7 @@ final class UnlockPanel: NSPanel {
         switch error?.code {
         case .authenticationFailed?:
             controller?.touchIDFailed()
-            showFeedback("Touch ID not recognized")
+            showFeedback(.touchIDFailed)
             shake()
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
                 MainActor.assumeIsolated { self?.armTouchID() }
@@ -296,8 +311,10 @@ final class UnlockPanel: NSPanel {
         case .biometryLockout?:
             touchIDLockedOut = true
             showLockSymbol()
-            showFeedback("Touch ID is locked")
+            // Open the field first: on Tiny it takes the title's place, so the message has to go
+            // inside the field, where it can be seen.
             setPasswordVisible(true)
+            showFeedback(.touchIDLocked)
         default:
             // Cancelled because the card lost focus, or similar: re-armed when it's focused again.
             break
@@ -329,7 +346,7 @@ final class UnlockPanel: NSPanel {
             passwordField.isEnabled = true
             submitButton.isEnabled = true
             passwordField.stringValue = ""
-            showFeedback("Incorrect password")
+            showFeedback(.wrongPassword)
             shake()
             focusPasswordField()
             restartIdleTimer()
@@ -357,7 +374,7 @@ final class UnlockPanel: NSPanel {
     private func throttleTick() {
         let remaining = Int(ceil(throttleUntil.timeIntervalSinceNow))
         guard remaining <= 0 else {
-            showFeedback("Try again in \(remaining) s")
+            showFeedback(.wait(seconds: remaining))
             return
         }
         throttleTimer?.invalidate()
@@ -368,12 +385,61 @@ final class UnlockPanel: NSPanel {
         restartIdleTimer()
     }
 
+    /// What went wrong, worded to fit the pill: the one-line pill is too narrow for the full wording.
+    enum Feedback: Equatable {
+        case touchIDFailed, touchIDLocked, wrongPassword
+        case wait(seconds: Int)
+
+        func text(oneLine: Bool) -> String {
+            switch (self, oneLine) {
+            case (.touchIDFailed, false): "Touch ID not recognized"
+            case (.touchIDFailed, true): "Not recognized"
+            case (.touchIDLocked, false): "Touch ID is locked"
+            case (.touchIDLocked, true): "Touch ID locked"
+            case (.wrongPassword, false): "Incorrect password"
+            case (.wrongPassword, true): "Wrong password"
+            case (.wait(let seconds), false): "Try again in \(seconds) s"
+            case (.wait(let seconds), true): "Wait \(seconds) s"
+            }
+        }
+
+        /// The longest each one gets: waits are capped at 5 minutes.
+        static let longest: [Feedback] = [.touchIDFailed, .touchIDLocked, .wrongPassword, .wait(seconds: 300)]
+    }
+
+    private var titleFeedbackFont: NSFont { .systemFont(ofSize: metrics.titleFont, weight: .semibold) }
+    private var fieldFeedbackFont: NSFont { .systemFont(ofSize: metrics.helperFont) }
+
+    /// How wide a piece of feedback is, on the title or inside the empty field, and how much room
+    /// that spot has, so tests can check every message fits a one-line pill.
+    func feedbackWidth(_ feedback: Feedback, inField: Bool) -> CGFloat {
+        let font = inField ? fieldFeedbackFont : titleFeedbackFont
+        return ceil((feedback.text(oneLine: metrics.oneLine) as NSString).size(withAttributes: [.font: font]).width)
+    }
+
+    func feedbackSpace(inField: Bool) -> CGFloat {
+        card.layoutSubtreeIfNeeded()
+        if inField, let cell = passwordField.cell {
+            return cell.drawingRect(forBounds: passwordField.bounds).width
+        }
+        // The title can use the whole text column: the pill's width less the fingerprint and insets.
+        return metrics.size.width - metrics.leftInset - metrics.fingerprintBox - metrics.spacing - metrics.rightInset
+    }
+
     /// Feedback (wrong password, wait time) briefly takes the title's place, in red.
-    private func showFeedback(_ text: String, until: Date? = nil) {
+    private func showFeedback(_ feedback: Feedback, until: Date? = nil) {
+        let text = feedback.text(oneLine: metrics.oneLine)
         feedbackTimer?.invalidate()
-        titleLabel.stringValue = text
-        titleLabel.textColor = .systemRed
+        if metrics.oneLine && !passwordRow.isHidden {
+            // A one-line pill's title is hidden while the field is open; the empty field shows it.
+            passwordField.placeholderAttributedString = NSAttributedString(string: text, attributes: [
+                .foregroundColor: NSColor.systemRed, .font: fieldFeedbackFont,
+            ])
+        } else {
+            titleFeedback = text
+        }
         isShowingFeedback = true
+        refreshTitle()
         guard until == nil else { return }
         let timer = Timer(timeInterval: feedbackDuration, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated { self?.hideFeedback() }
@@ -385,9 +451,82 @@ final class UnlockPanel: NSPanel {
     private func hideFeedback() {
         feedbackTimer?.invalidate()
         isShowingFeedback = false
-        titleLabel.stringValue = Self.title
-        titleLabel.textColor = .labelColor
+        titleFeedback = nil
+        passwordField.placeholderAttributedString = nil
+        passwordField.placeholderString = "Password"
+        refreshTitle()
     }
+
+    /// Feedback shown on the title, if any.
+    private var titleFeedback: String?
+    /// True while the pointer is over the pill.
+    private var isPointerInside = false
+
+    /// Tiny has no helper line, so while the pointer is over it the title gives way to a hint
+    /// that a double-click opens the password field. Only while the field is closed, and never
+    /// over feedback. Hovering never opens anything; the double-click still does.
+    static let hoverHint = "Double-click to type"
+    private var wantsHoverHint: Bool {
+        metrics.oneLine && isPointerInside && passwordRow.isHidden && titleFeedback == nil
+    }
+
+    /// What the title line is showing right now.
+    enum TitleContent { case title, hint, feedback }
+    private(set) var titleContent = TitleContent.title
+    var showsHoverHint: Bool { titleContent == .hint }
+
+    /// How wide the hint is in its font, and how much room the title has, so tests can check it fits.
+    var hoverHintWidth: CGFloat {
+        ceil((Self.hoverHint as NSString).size(withAttributes: [.font: hintFont]).width)
+    }
+
+    private var hintFont: NSFont { .systemFont(ofSize: metrics.titleFont) }
+
+    /// Shows feedback, the hover hint or the title, in that order of priority.
+    private func refreshTitle() {
+        if let titleFeedback {
+            titleLabel.stringValue = titleFeedback
+            titleLabel.textColor = .systemRed
+            titleLabel.font = titleFeedbackFont
+            titleContent = .feedback
+        } else if wantsHoverHint {
+            titleLabel.stringValue = Self.hoverHint
+            titleLabel.textColor = .secondaryLabelColor
+            titleLabel.font = hintFont
+            titleContent = .hint
+        } else {
+            titleLabel.stringValue = Self.title
+            titleLabel.textColor = .labelColor
+            titleLabel.font = titleFeedbackFont
+            titleContent = .title
+        }
+    }
+
+    // MARK: Hover
+
+    /// The pointer moved onto or off the pill. Internal so tests can call them without a mouse.
+    func pointerEntered() {
+        isPointerInside = true
+        refreshTitle()
+    }
+
+    func pointerExited() {
+        isPointerInside = false
+        refreshTitle()
+    }
+
+    override func mouseEntered(with event: NSEvent) { pointerEntered() }
+    override func mouseExited(with event: NSEvent) { pointerExited() }
+
+    /// Hover is tracked even while Clearlock isn't the active app, which it isn't while locked:
+    /// the pill is a non-activating panel so the agents' app stays in front.
+    static let hoverTrackingOptions: NSTrackingArea.Options = [.mouseEnteredAndExited, .activeAlways, .inVisibleRect]
+    var hoverTrackingAreas: [NSTrackingArea] { card.trackingAreas }
+
+    /// True while feedback shows inside the empty password field (one-line pills only).
+    var isFeedbackInField: Bool { passwordField.placeholderAttributedString != nil }
+    /// False while the password field has taken a one-line pill's title place.
+    var showsTitle: Bool { !titleLabel.isHidden }
 
     /// True while feedback has taken the title's place.
     private(set) var isShowingFeedback = false
@@ -417,37 +556,37 @@ final class UnlockPanel: NSPanel {
         // Left: the fingerprint, or a lock symbol on Macs without Touch ID.
         touchIDContainer.translatesAutoresizingMaskIntoConstraints = false
         lockSymbol.image = NSImage(systemSymbolName: "lock.fill", accessibilityDescription: "Locked")
-        lockSymbol.symbolConfiguration = .init(pointSize: 21, weight: .semibold)
+        lockSymbol.symbolConfiguration = .init(pointSize: metrics.lockSymbol, weight: .semibold)
         lockSymbol.contentTintColor = .secondaryLabelColor
         lockSymbol.translatesAutoresizingMaskIntoConstraints = false
         lockSymbol.isHidden = touchIDEnabled
         touchIDContainer.addSubview(lockSymbol)
         NSLayoutConstraint.activate([
-            touchIDContainer.widthAnchor.constraint(equalToConstant: 44),
-            touchIDContainer.heightAnchor.constraint(equalToConstant: 44),
+            touchIDContainer.widthAnchor.constraint(equalToConstant: metrics.fingerprintBox),
+            touchIDContainer.heightAnchor.constraint(equalToConstant: metrics.fingerprintBox),
             lockSymbol.centerXAnchor.constraint(equalTo: touchIDContainer.centerXAnchor),
             lockSymbol.centerYAnchor.constraint(equalTo: touchIDContainer.centerYAnchor),
         ])
 
         // Right: title over a helper line, which the password field replaces.
         titleLabel.stringValue = Self.title
-        titleLabel.font = .systemFont(ofSize: 15, weight: .semibold)
+        titleLabel.font = .systemFont(ofSize: metrics.titleFont, weight: .semibold)
         titleLabel.textColor = .labelColor
 
         helperLabel.stringValue = touchIDEnabled ? "Touch ID, or double-click for password" : "Type your password to unlock"
-        helperLabel.font = .systemFont(ofSize: 12)
+        helperLabel.font = .systemFont(ofSize: metrics.helperFont)
         helperLabel.textColor = .secondaryLabelColor
 
         passwordField.placeholderString = "Password"
         passwordField.bezelStyle = .roundedBezel
-        passwordField.controlSize = .regular
-        passwordField.font = .systemFont(ofSize: 12)
+        passwordField.controlSize = metrics.fieldControlSize
+        passwordField.font = .systemFont(ofSize: metrics.helperFont)
         passwordField.target = self
         passwordField.action = #selector(submitPassword)
         passwordField.setAccessibilityLabel("Password")
 
         submitButton.image = NSImage(systemSymbolName: "arrow.right.circle.fill", accessibilityDescription: "Unlock")
-        submitButton.symbolConfiguration = .init(pointSize: 17, weight: .regular)
+        submitButton.symbolConfiguration = .init(pointSize: metrics.submitSymbol, weight: .regular)
         submitButton.isBordered = false
         submitButton.contentTintColor = .secondaryLabelColor
         submitButton.target = self
@@ -456,10 +595,12 @@ final class UnlockPanel: NSPanel {
         passwordRow.setViews([passwordField, submitButton], in: .leading)
         passwordRow.spacing = 6
 
-        // The helper line and the password field share one fixed-height slot.
+        // The helper line and the password field share one fixed-height slot. A one-line pill
+        // has no helper line: the title and the field share it.
         let detailSlot = NSView()
         detailSlot.translatesAutoresizingMaskIntoConstraints = false
-        for view in [helperLabel, passwordRow] as [NSView] {
+        let slotViews: [NSView] = metrics.oneLine ? [titleLabel, passwordRow] : [helperLabel, passwordRow]
+        for view in slotViews {
             view.translatesAutoresizingMaskIntoConstraints = false
             detailSlot.addSubview(view)
             NSLayoutConstraint.activate([
@@ -468,12 +609,17 @@ final class UnlockPanel: NSPanel {
                 view.centerYAnchor.constraint(equalTo: detailSlot.centerYAnchor),
             ])
         }
+        // On the one-line pill the field and its button fill exactly the title's width, so the
+        // pill fits both with no empty glass at the end.
+        let fieldWidth = metrics.oneLine
+            ? PillSize.oneLineTextWidth - passwordRow.spacing - submitButton.intrinsicContentSize.width
+            : metrics.fieldWidth
         NSLayoutConstraint.activate([
-            detailSlot.heightAnchor.constraint(equalToConstant: 22),
-            passwordField.widthAnchor.constraint(equalToConstant: 200),
+            detailSlot.heightAnchor.constraint(equalToConstant: metrics.detailHeight),
+            passwordField.widthAnchor.constraint(equalToConstant: fieldWidth),
         ])
 
-        let text = NSStackView(views: [titleLabel, detailSlot])
+        let text = NSStackView(views: metrics.oneLine ? [detailSlot] : [titleLabel, detailSlot])
         text.orientation = .vertical
         text.alignment = .leading
         text.spacing = 2
@@ -481,8 +627,8 @@ final class UnlockPanel: NSPanel {
         let row = NSStackView(views: [touchIDContainer, text])
         row.orientation = .horizontal
         row.alignment = .centerY
-        row.spacing = 12
-        row.edgeInsets = NSEdgeInsets(top: 0, left: 16, bottom: 0, right: 24)
+        row.spacing = metrics.spacing
+        row.edgeInsets = NSEdgeInsets(top: 0, left: metrics.leftInset, bottom: 0, right: metrics.rightInset)
         row.translatesAutoresizingMaskIntoConstraints = false
 
         // The window is a transparent canvas exactly the pill's size; the glass is the
@@ -490,7 +636,7 @@ final class UnlockPanel: NSPanel {
         let canvas = NSView()
         card.wantsLayer = true
         card.translatesAutoresizingMaskIntoConstraints = false
-        glass.cornerRadius = Self.pillSize.height / 2
+        glass.cornerRadius = metrics.size.height / 2
         glass.translatesAutoresizingMaskIntoConstraints = false
         canvas.addSubview(card)
         card.addSubview(glass)
@@ -500,8 +646,8 @@ final class UnlockPanel: NSPanel {
             card.bottomAnchor.constraint(equalTo: canvas.bottomAnchor),
             card.leadingAnchor.constraint(equalTo: canvas.leadingAnchor),
             card.trailingAnchor.constraint(equalTo: canvas.trailingAnchor),
-            card.widthAnchor.constraint(equalToConstant: Self.pillSize.width),
-            card.heightAnchor.constraint(equalToConstant: Self.pillSize.height),
+            card.widthAnchor.constraint(equalToConstant: metrics.size.width),
+            card.heightAnchor.constraint(equalToConstant: metrics.size.height),
             glass.topAnchor.constraint(equalTo: card.topAnchor),
             glass.bottomAnchor.constraint(equalTo: card.bottomAnchor),
             glass.leadingAnchor.constraint(equalTo: card.leadingAnchor),
@@ -512,5 +658,8 @@ final class UnlockPanel: NSPanel {
             row.trailingAnchor.constraint(lessThanOrEqualTo: card.trailingAnchor),
         ])
         contentView = canvas
+        if metrics.oneLine {
+            card.addTrackingArea(NSTrackingArea(rect: .zero, options: Self.hoverTrackingOptions, owner: self, userInfo: nil))
+        }
     }
 }

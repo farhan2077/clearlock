@@ -1,5 +1,4 @@
 import AppKit
-import Carbon.HIToolbox
 
 /// Which copy of Clearlock is running. Debug builds are **Clearlock Dev**: a separate app
 /// with its own bundle ID, so it runs next to the installed release and shares nothing
@@ -48,14 +47,6 @@ enum AppVariant: Equatable {
         switch self {
         case .release: "/etc/sudoers.d/clearlock"
         case .dev: "/etc/sudoers.d/clearlock-dev"
-        }
-    }
-
-    /// ⇧⌘L for the release; ⌃⇧⌘L for Dev, so both copies can hold a shortcut at once.
-    var defaultLockShortcut: Shortcut {
-        switch self {
-        case .release: .defaultLock
-        case .dev: Shortcut(keyCode: UInt32(kVK_ANSI_L), modifiers: [.control, .command, .shift], key: "L")
         }
     }
 

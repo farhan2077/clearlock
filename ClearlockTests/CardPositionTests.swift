@@ -9,23 +9,24 @@ struct CardPositionTests {
     let area = NSRect(x: -1440, y: 200, width: 1440, height: 900)
     let topInset: CGFloat = 37
 
-    private func frame(_ position: CardPosition) -> NSRect {
-        UnlockPanel.frame(for: position, in: area, topInset: topInset)
+    private func frame(_ position: CardPosition, _ size: PillSize = .defaultSize) -> NSRect {
+        UnlockPanel.frame(for: position, in: area, topInset: topInset, size: size.metrics.size)
     }
 
-    @Test("Every position keeps the whole pill on screen, at full size, clear of the edges and the menu bar",
-          arguments: CardPosition.allCases)
-    func staysOnScreen(position: CardPosition) {
-        let pill = frame(position)
+    @Test("Every position keeps the whole pill on screen, at full size, clear of the edges and the menu bar, at every pill size",
+          arguments: CardPosition.allCases, PillSize.allCases)
+    func staysOnScreen(position: CardPosition, size: PillSize) {
+        let pill = frame(position, size)
         let safe = NSRect(x: area.minX, y: area.minY, width: area.width, height: area.height - topInset)
             .insetBy(dx: UnlockPanel.edgeMargin, dy: UnlockPanel.edgeMargin)
-        #expect(pill.size == UnlockPanel.pillSize)
+        #expect(pill.size == size.metrics.size)
         #expect(safe.contains(pill))
     }
 
-    @Test("Each position puts the pill on its own side of the screen", arguments: CardPosition.allCases)
-    func matchesItsName(position: CardPosition) {
-        let pill = frame(position)
+    @Test("Each position puts the pill on its own side of the screen, at every pill size",
+          arguments: CardPosition.allCases, PillSize.allCases)
+    func matchesItsName(position: CardPosition, size: PillSize) {
+        let pill = frame(position, size)
         switch position.column {
         case -1: #expect(pill.minX == area.minX + UnlockPanel.edgeMargin)
         case 1: #expect(pill.maxX == area.maxX - UnlockPanel.edgeMargin)

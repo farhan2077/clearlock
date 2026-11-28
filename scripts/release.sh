@@ -6,6 +6,7 @@
 #                                        packages into build/release/. Changes no files, publishes nothing.
 #   scripts/release.sh 1.0.0 --publish   Also sets the version in the project, commits it, tags
 #                                        v1.0.0, pushes, and creates the GitHub release with both files.
+#                                        The README's app size badge is kept by hand; this never edits it.
 #
 # Only publish when the owner has asked for that exact version (see CLAUDE.md).
 set -euo pipefail
@@ -65,7 +66,7 @@ if (( PUBLISH )); then
   [[ $(git rev-parse HEAD) == $(git rev-parse origin/main) ]] || die "main isn't in sync with GitHub; pull or push first"
 
   # Undo the version change if anything fails before it's committed.
-  trap 'git checkout -- "$PBX" "$ROOT/README.md" 2>/dev/null' EXIT
+  trap 'git checkout -- "$PBX" 2>/dev/null' EXIT
   sed -i '' -E "s/MARKETING_VERSION = [^;]+;/MARKETING_VERSION = $VERSION;/" "$PBX"
   sed -i '' -E "s/CURRENT_PROJECT_VERSION = [0-9]+;/CURRENT_PROJECT_VERSION = $BUILD;/" "$PBX"
 fi
@@ -96,14 +97,15 @@ security unlock-keychain -p clearlock "$KEYCHAIN"
 codesign --force --timestamp=none --keychain "$KEYCHAIN" -s "$IDENTITY" --identifier com.farhan2077.clearlock.dmg "$DMG"
 hdiutil verify -quiet "$DMG"
 
-# The installed app's size, in decimal megabytes like Finder shows, for the README badge.
+# The installed app's size, in decimal megabytes like Finder shows. Shown only; the README badge
+# is the owner's to set by hand.
 APP_BYTES=$(unzip -l "$ZIP" | tail -1 | awk '{print $1}')
 APP_SIZE=$(awk -v b="$APP_BYTES" 'BEGIN { printf "%.1f", b / 1000000 }')
 
 print "Packaged:"
 for f in "$DMG" "$ZIP"; do print "  ${f#$ROOT/}  $(du -h "$f" | cut -f1)  sha256 $(shasum -a 256 "$f" | cut -c1-16)…"; done
 
-print "  app size $APP_SIZE MB (README badge)"
+print "  app size $APP_SIZE MB installed"
 
 if (( ! PUBLISH )); then
   print "Dry run: nothing was committed, tagged or published."
@@ -111,13 +113,7 @@ if (( ! PUBLISH )); then
   exit 0
 fi
 
-README="$ROOT/README.md"
-sed -i '' -E -e "s|badge/app%20size-[0-9.]+%20MB-|badge/app%20size-$APP_SIZE%20MB-|" \
-  -e "s|alt=\"App size [0-9.]+ MB\"|alt=\"App size $APP_SIZE MB\"|" "$README"
-# A badge the pattern no longer matches would silently keep the old size.
-grep -q "badge/app%20size-$APP_SIZE%20MB-" "$README" && grep -q "alt=\"App size $APP_SIZE MB\"" "$README" \
-  || die "couldn't update the app size badge in README.md; its format changed"
-git add "$PBX" "$README"
+git add "$PBX"
 git commit --quiet -m "Release $VERSION"
 trap - EXIT
 git tag -a "v$VERSION" -m "Clearlock $VERSION"
